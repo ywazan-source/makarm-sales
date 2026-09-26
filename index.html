@@ -6,6 +6,7 @@
 <title>فخامة في كل التفاصيل</title>
 <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;800;900&family=Playfair+Display:ital@0;1&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore-compat.js"></script>
@@ -2504,46 +2505,57 @@ function exportOrderPDF(o){
 }
 
 
-function exportManagerPDF(){
-  const { jsPDF } = window.jspdf;
-  const doc = new jsPDF({orientation:'landscape',unit:'mm',format:'a4'});
-  const orders = getOrders().filter(o=>!o.invoiceNumber);
-  const pw=doc.internal.pageSize.getWidth(), ph=doc.internal.pageSize.getHeight();
-  const pRed=[111,34,38], pGold=[201,169,110], pWhite=[255,255,255], pDark=[44,24,16], pCream=[250,246,240];
-  doc.setFillColor(...pCream); doc.rect(0,0,pw,ph,'F');
-  doc.setFillColor(...pRed); doc.rect(0,0,pw,22,'F');
-  doc.setFont('helvetica','bold'); doc.setFontSize(10); doc.setTextColor(...pGold);
-  doc.text('MAKARM — تقرير مدير الفروع', pw/2, 14, {align:'center'});
+// jsPDF's built-in fonts have no Arabic glyphs, so the report is laid out
+// as real RTL HTML, rasterized with html2canvas, then paged into the PDF.
+async function exportManagerPDF(){
+  const orders = getOrders().filter(o=>!o.invoiceNumber && !o.hiddenForManager).slice().reverse();
   const now=new Date(); const dateStr=`${now.getDate()}/${now.getMonth()+1}/${now.getFullYear()}`;
-  doc.setFontSize(8); doc.setTextColor(...pWhite);
-  doc.text(`تاريخ التصدير: ${dateStr}`, pw-10, 14, {align:'right'});
-  if(orders.length===0){ doc.setTextColor(...pDark); doc.setFontSize(12); doc.text('لا توجد طلبات',pw/2,60,{align:'center'}); doc.save('MAKARM-Manager-Report.pdf'); return; }
-  const cols=[{h:'رقم الطلب',w:35},{h:'كود البائع',w:28},{h:'الفرع',w:28},{h:'التاريخ',w:28},{h:'المنتجات',w:60},{h:'نوع الطلب',w:40},{h:'ملاحظات',w:40}];
-  let curY=28; const rowH=9;
-  // Header row
-  doc.setFillColor(...pGold); let cx=10;
-  cols.forEach(c=>{ doc.rect(cx,curY,c.w,rowH,'F'); cx+=c.w; });
-  doc.setFont('helvetica','bold'); doc.setFontSize(7.5); doc.setTextColor(...pWhite);
-  cx=10; cols.forEach(c=>{ doc.text(c.h, cx+c.w/2, curY+6,{align:'center'}); cx+=c.w; });
-  curY+=rowH;
-  orders.slice().reverse().forEach((o,i)=>{
-    if(curY+rowH>ph-15){ doc.addPage(); doc.setFillColor(...pCream); doc.rect(0,0,pw,ph,'F'); curY=15; }
-    const bg = i%2===0 ? [255,255,255] : [248,244,238];
-    doc.setFillColor(...bg); cx=10;
-    cols.forEach(c=>{ doc.rect(cx,curY,c.w,rowH,'F'); cx+=c.w; });
-    doc.setDrawColor(220,200,180); doc.setLineWidth(0.1); cx=10;
-    cols.forEach(c=>{ doc.rect(cx,curY,c.w,rowH,'S'); cx+=c.w; });
-    const cats=(o.categories||[]).map(c=>`${c.name}(${c.qty||1})`).join(', ');
-    const rTypes=(o.requestTypes||[]).join(', ');
-    const vals=[o.reqNumber||'',o.sellerCode||'',o.branchCode||'',o.date||'',cats,rTypes,o.notes||''];
-    doc.setFont('helvetica','normal'); doc.setFontSize(7); doc.setTextColor(...pDark);
-    cx=10; vals.forEach((v,vi)=>{ doc.text(String(v), cx+cols[vi].w/2, curY+6,{align:'center',maxWidth:cols[vi].w-2}); cx+=cols[vi].w; });
-    curY+=rowH;
-  });
-  doc.setFillColor(...pRed); doc.rect(0,ph-10,pw,10,'F');
-  doc.setFont('helvetica','normal'); doc.setFontSize(7); doc.setTextColor(...pGold);
-  doc.text('MAKARM —فخامة في كل التفاصيل', pw/2, ph-4, {align:'center'});
-  doc.save(`MAKARM-Manager-Report-${dateStr.replace(/\//g,'-')}.pdf`);
+  const rows = orders.map((o,i)=>{
+    const cats=(o.categories||[]).map(c=>`${esc(c.name)} ×${Number(c.qty)||1}`).join('، ');
+    const rTypes=(o.requestTypes||[]).map(esc).join('، ');
+    return `<tr style="background:${i%2?'#f8f4ee':'#fff'}">
+      <td>${esc(o.reqNumber)}</td><td>${esc(o.sellerCode)}</td><td>${esc(o.branchCode)}</td>
+      <td>${esc(o.date)}</td><td>${cats||'—'}</td><td>${rTypes||'—'}</td><td>${esc(o.notes)||'—'}</td></tr>`;
+  }).join('');
+  const box = document.createElement('div');
+  box.dir = 'rtl';
+  box.style.cssText = 'position:fixed;left:-10000px;top:0;width:1120px;background:#faf6f0;font-family:Tajawal,sans-serif;color:#2c1810;';
+  box.innerHTML = `
+    <div style="background:#6f2226;color:#c9a96e;padding:18px 24px;display:flex;justify-content:space-between;align-items:center;">
+      <div style="font-size:20px;font-weight:800;">مكارم — تقرير مدير الفروع</div>
+      <div style="color:#fff;font-size:13px;">تاريخ التصدير: ${dateStr}</div>
+    </div>
+    <div style="padding:20px 24px;">
+      ${orders.length===0 ? '<div style="text-align:center;padding:40px;font-size:16px;">لا توجد طلبات</div>' : `
+      <table style="width:100%;border-collapse:collapse;font-size:12px;">
+        <thead><tr style="background:#c9a96e;color:#fff;">
+          <th>رقم الطلب</th><th>كود البائع</th><th>الفرع</th><th>التاريخ</th><th>المنتجات</th><th>نوع الطلب</th><th>ملاحظات</th>
+        </tr></thead>
+        <tbody>${rows}</tbody>
+      </table>`}
+    </div>`;
+  box.querySelectorAll('th,td').forEach(c=>{ c.style.padding='8px 10px'; c.style.border='1px solid #e5d6c3'; c.style.textAlign='center'; });
+  document.body.appendChild(box);
+  try{
+    const canvas = await html2canvas(box, { scale:2, backgroundColor:'#faf6f0' });
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF({orientation:'landscape',unit:'mm',format:'a4'});
+    const pw=doc.internal.pageSize.getWidth(), ph=doc.internal.pageSize.getHeight();
+    const pxPerPage = Math.floor(canvas.width * ph / pw);
+    for(let y=0, page=0; y<canvas.height; y+=pxPerPage, page++){
+      const slice = document.createElement('canvas');
+      slice.width = canvas.width; slice.height = Math.min(pxPerPage, canvas.height-y);
+      slice.getContext('2d').drawImage(canvas, 0, y, canvas.width, slice.height, 0, 0, canvas.width, slice.height);
+      if(page>0) doc.addPage();
+      doc.addImage(slice.toDataURL('image/jpeg',0.92), 'JPEG', 0, 0, pw, slice.height*pw/canvas.width);
+    }
+    doc.save(`MAKARM-Manager-Report-${dateStr.replace(/\//g,'-')}.pdf`);
+  }catch(err){
+    console.error('exportManagerPDF error', err);
+    showToast('تعذّر تصدير PDF','⚠️','toast-warning');
+  }finally{
+    box.remove();
+  }
 }
 
 // ══════════════════════════════════════════════════════
