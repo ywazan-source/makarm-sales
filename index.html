@@ -2062,15 +2062,25 @@ function renderMyInvoices(){
   }
   wrap.innerHTML = [...myInvoices].reverse().map(o=>{
     const timeStr = o.time ? ` - ${o.time}` : '';
+    const completionPart = o.completionDate ? ` • تاريخ الانتهاء: ${esc(isoToDMY(o.completionDate))}` : '';
     return `<div class="seller-order-card">
       <div class="seller-order-head">
         <div>
           <div class="seller-order-num">🧾 ${esc(o.invoiceNumber)}</div>
-          <div class="seller-order-date">فرع ${esc(o.branchCode)||'—'} • ${esc(o.date)||'—'}${esc(timeStr)}</div>
+          <div class="seller-order-date">فرع ${esc(o.branchCode)||'—'} • ${esc(o.date)||'—'}${esc(timeStr)}${completionPart}</div>
+        </div>
+        <div class="seller-order-status">
+          <div class="status-dot${o.completed?' has-reply':''}"></div>
+          <span class="status-label${o.completed?' has-reply':''}">${o.completed?'منتهية':'قيد المعالجة'}</span>
         </div>
       </div>
     </div>`;
   }).join('');
+}
+function isoToDMY(iso){
+  if(!iso) return '';
+  const [y,m,d] = iso.split('-');
+  return `${Number(d)}/${Number(m)}/${y}`;
 }
 
 function formatKey(k){
@@ -2271,15 +2281,37 @@ function renderManagerInvoicesTable(){
       <td><strong>${esc(o.sellerCode)||'—'}</strong></td>
       <td>${esc(o.branchCode)||'—'}</td>
       <td style="white-space:nowrap">${esc(o.date)||'—'}${esc(timeStr)}</td>
+      <td><input type="date" class="field-input" style="padding:6px 10px;font-size:12px;" value="${esc(o.completionDate)||''}" onchange="setInvoiceCompletionDate('${o.id}', this.value)"></td>
+      <td style="text-align:center"><input type="checkbox" style="width:18px;height:18px;cursor:pointer;" ${o.completed?'checked':''} onchange="setInvoiceCompleted('${o.id}', this.checked)" title="تمت من قبل المدير"></td>
       <td>${replyIndicator}<button onclick="showOrderDetail(${idx})" style="background:rgba(111,34,38,0.08);border:1px solid rgba(111,34,38,0.15);color:var(--primary);border-radius:8px;padding:5px 12px;font-family:Tajawal,sans-serif;font-size:12px;font-weight:600;cursor:pointer;">رد / تفاصيل</button></td>
     </tr>`;
   }).join('');
   body.innerHTML=`<table class="req-table">
     <thead><tr>
-      <th>رقم الفاتورة</th><th>كود البائع</th><th>الفرع</th><th>التاريخ</th><th>رد</th>
+      <th>رقم الفاتورة</th><th>كود البائع</th><th>الفرع</th><th>التاريخ</th><th>تاريخ الانتهاء</th><th>تم</th><th>رد</th>
     </tr></thead>
     <tbody>${rows}</tbody>
   </table>`;
+}
+
+async function setInvoiceCompletionDate(orderId, value){
+  try{
+    await authReady;
+    await db.collection('orders').doc(orderId).update({ completionDate: value||null });
+    showToast('تم حفظ تاريخ الانتهاء ✓','✓','toast-success');
+  }catch(err){
+    console.error('setInvoiceCompletionDate error', err);
+    showToast('تعذّر الحفظ، تحقق من الإنترنت','⚠️','toast-warning');
+  }
+}
+async function setInvoiceCompleted(orderId, checked){
+  try{
+    await authReady;
+    await db.collection('orders').doc(orderId).update({ completed: checked });
+  }catch(err){
+    console.error('setInvoiceCompleted error', err);
+    showToast('تعذّر الحفظ، تحقق من الإنترنت','⚠️','toast-warning');
+  }
 }
 
 function showOrderDetail(idx){
