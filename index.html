@@ -1771,7 +1771,7 @@ function renderSellerOrders(){
   const wrap = document.getElementById('sellerOrdersWrap');
   if(!wrap) return;
   const allOrders = getOrders();
-  const myOrders = code ? allOrders.filter(o=>o.sellerCode===code) : [];
+  const myOrders = code ? allOrders.filter(o=>o.sellerCode===code && !o.invoiceNumber && !o.hiddenForSeller) : [];
   // Update badge
   const newReplies = myOrders.filter(o=>o.thread&&o.thread.some(m=>m.from==='manager'&&!m.seenBySeller)).length;
   const badge = document.getElementById('ordersTabBadge');
@@ -1797,6 +1797,7 @@ function renderSellerOrders(){
         <div class="seller-order-status">
           <div class="status-dot${hasReply?' has-reply':''}"></div>
           <span class="status-label${hasReply?' has-reply':''}">${hasReply?'رد من المدير':'بانتظار الرد'}</span>
+          <button onclick="hideOrderForSeller('${o.id}')" title="حذف من عندي" style="background:none;border:none;color:#e53e3e;cursor:pointer;font-size:15px;padding:2px 4px;">🗑</button>
         </div>
       </div>
       ${cats ? `<div class="seller-order-products">${cats}</div>`:''}
@@ -1877,7 +1878,7 @@ function updateOrdersBadge(){
   const code = getSellerCode();
   if(!code) return;
   const orders = getOrders();
-  const newReplies = orders.filter(o=>o.sellerCode===code&&o.thread&&o.thread.some(m=>m.from==='manager'&&!m.seenBySeller)).length;
+  const newReplies = orders.filter(o=>o.sellerCode===code&&!o.hiddenForSeller&&o.thread&&o.thread.some(m=>m.from==='manager'&&!m.seenBySeller)).length;
   const badge = document.getElementById('ordersTabBadge');
   if(badge) badge.innerHTML = newReplies > 0 ? `<span class="tab-badge">${newReplies}</span>` : '';
 }
@@ -2053,7 +2054,7 @@ function renderMyInvoices(){
   const code = getSellerCode();
   const wrap = document.getElementById('myInvoicesWrap');
   if(!wrap) return;
-  const myInvoices = (code ? getOrders().filter(o=>o.sellerCode===code) : []).filter(o=>o.invoiceNumber);
+  const myInvoices = (code ? getOrders().filter(o=>o.sellerCode===code) : []).filter(o=>o.invoiceNumber && !o.hiddenForSeller);
   if(myInvoices.length===0){
     wrap.innerHTML='<div class="seller-orders-empty">لا توجد فواتير مرسلة بعد</div>';
     return;
@@ -2070,6 +2071,7 @@ function renderMyInvoices(){
         <div class="seller-order-status">
           <div class="status-dot${o.completed?' has-reply':''}"></div>
           <span class="status-label${o.completed?' has-reply':''}">${o.completed?'منتهية':'قيد المعالجة'}</span>
+          <button onclick="hideOrderForSeller('${o.id}')" title="حذف من عندي" style="background:none;border:none;color:#e53e3e;cursor:pointer;font-size:15px;padding:2px 4px;">🗑</button>
         </div>
       </div>
     </div>`;
@@ -2178,17 +2180,39 @@ async function saveOrder(orderData){
 function getOrders(){
   return ordersCache;
 }
+// "Deleting" never removes the Firestore document — it only hides it from
+// the side that deleted it, so the other side's copy is never affected.
 async function clearAllOrders(){
-  if(!confirm('هل أنت متأكد من مسح جميع الطلبات؟')) return;
+  if(!confirm('هل أنت متأكد من مسح جميع الطلبات؟ (لن تتأثر نسخة البائعين)')) return;
   try{
     await authReady;
     const batch = db.batch();
-    ordersCache.forEach(o=>batch.delete(db.collection('orders').doc(o.id)));
+    ordersCache.filter(o=>!o.invoiceNumber && !o.hiddenForManager).forEach(o=>batch.update(db.collection('orders').doc(o.id), { hiddenForManager:true }));
     await batch.commit();
     renderManagerTable();
   }catch(err){
     console.error('clearAllOrders error', err);
     showToast('تعذّر مسح الطلبات، حاول مجددًا','⚠️','toast-warning');
+  }
+}
+async function hideOrderForManager(orderId){
+  if(!confirm('إخفاء هذا الطلب من عندك؟ (يبقى ظاهرًا عند البائع)')) return;
+  try{
+    await authReady;
+    await db.collection('orders').doc(orderId).update({ hiddenForManager:true });
+  }catch(err){
+    console.error('hideOrderForManager error', err);
+    showToast('تعذّر الحذف، حاول مجددًا','⚠️','toast-warning');
+  }
+}
+async function hideOrderForSeller(orderId){
+  if(!confirm('إخفاء هذا العنصر من عندك؟ (يبقى ظاهرًا عند المدير)')) return;
+  try{
+    await authReady;
+    await db.collection('orders').doc(orderId).update({ hiddenForSeller:true });
+  }catch(err){
+    console.error('hideOrderForSeller error', err);
+    showToast('تعذّر الحذف، حاول مجددًا','⚠️','toast-warning');
   }
 }
 
@@ -2209,7 +2233,7 @@ function switchManagerTab(tab){
 
 function renderManagerTable(){
   const allOrders = getOrders();
-  const orders = allOrders.filter(o=>!o.invoiceNumber);
+  const orders = allOrders.filter(o=>!o.invoiceNumber && !o.hiddenForManager);
   // Stats
   const statsEl = document.getElementById('managerStats');
   const sellers = [...new Set(orders.map(o=>o.sellerCode))];
@@ -2243,7 +2267,7 @@ function renderManagerTable(){
       <td class="req-detail-cell">${catChips||'—'}</td>
       <td>${reqTypes||'—'}</td>
       <td style="max-width:140px;font-size:12px;color:var(--text-mid);">${esc(o.notes)||'—'}</td>
-      <td>${replyIndicator}<button onclick="showOrderDetail(${idx})" style="background:rgba(111,34,38,0.08);border:1px solid rgba(111,34,38,0.15);color:var(--primary);border-radius:8px;padding:5px 12px;font-family:Tajawal,sans-serif;font-size:12px;font-weight:600;cursor:pointer;">رد / تفاصيل</button></td>
+      <td style="white-space:nowrap">${replyIndicator}<button onclick="showOrderDetail(${idx})" style="background:rgba(111,34,38,0.08);border:1px solid rgba(111,34,38,0.15);color:var(--primary);border-radius:8px;padding:5px 12px;font-family:Tajawal,sans-serif;font-size:12px;font-weight:600;cursor:pointer;">رد / تفاصيل</button> <button onclick="hideOrderForManager('${o.id}')" title="حذف من عندي" style="background:rgba(229,62,62,0.08);border:1px solid rgba(229,62,62,0.2);color:#e53e3e;border-radius:8px;padding:5px 10px;font-family:Tajawal,sans-serif;font-size:12px;font-weight:600;cursor:pointer;">🗑</button></td>
     </tr>`;
   }).join('');
   body.innerHTML=`<table class="req-table">
@@ -2257,7 +2281,7 @@ function renderManagerTable(){
 
 function renderManagerInvoicesTable(){
   const allOrders = getOrders();
-  const invoices = allOrders.filter(o=>o.invoiceNumber);
+  const invoices = allOrders.filter(o=>o.invoiceNumber && !o.hiddenForManager);
   const body = document.getElementById('managerInvoicesBody');
   if(invoices.length===0){
     body.innerHTML='<div class="manager-empty">لا توجد فواتير مسجلة بعد</div>';
@@ -2281,7 +2305,7 @@ function renderManagerInvoicesTable(){
       <td style="white-space:nowrap">${esc(o.date)||'—'}${esc(timeStr)}</td>
       <td><input type="date" class="field-input" style="padding:6px 10px;font-size:12px;" value="${esc(o.completionDate)||''}" onchange="setInvoiceCompletionDate('${o.id}', this.value)"></td>
       <td style="text-align:center"><input type="checkbox" style="width:18px;height:18px;cursor:pointer;" ${o.completed?'checked':''} onchange="setInvoiceCompleted('${o.id}', this.checked)" title="تمت من قبل المدير"></td>
-      <td>${replyIndicator}<button onclick="showOrderDetail(${idx})" style="background:rgba(111,34,38,0.08);border:1px solid rgba(111,34,38,0.15);color:var(--primary);border-radius:8px;padding:5px 12px;font-family:Tajawal,sans-serif;font-size:12px;font-weight:600;cursor:pointer;">رد / تفاصيل</button></td>
+      <td style="white-space:nowrap">${replyIndicator}<button onclick="showOrderDetail(${idx})" style="background:rgba(111,34,38,0.08);border:1px solid rgba(111,34,38,0.15);color:var(--primary);border-radius:8px;padding:5px 12px;font-family:Tajawal,sans-serif;font-size:12px;font-weight:600;cursor:pointer;">رد / تفاصيل</button> <button onclick="hideOrderForManager('${o.id}')" title="حذف من عندي" style="background:rgba(229,62,62,0.08);border:1px solid rgba(229,62,62,0.2);color:#e53e3e;border-radius:8px;padding:5px 10px;font-family:Tajawal,sans-serif;font-size:12px;font-weight:600;cursor:pointer;">🗑</button></td>
     </tr>`;
   }).join('');
   body.innerHTML=`<table class="req-table">
