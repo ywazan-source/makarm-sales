@@ -1008,8 +1008,12 @@
     <div class="bottom-actions reveal">
       <button class="btn-primary" onclick="submitInvoice()"><span>📨</span><span>إرسال</span></button>
     </div>
-    <div class="section-header reveal" style="margin-top:32px;">
+    <div class="section-header reveal" style="margin-top:32px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">
       <div class="section-title" style="font-size:16px;">فواتيري المرسلة</div>
+      <div class="search-wrap">
+        <span class="search-icon">🔍</span>
+        <input type="text" class="search-input" id="myInvoiceSearchInput" placeholder="بحث برقم الفاتورة" oninput="renderMyInvoices()">
+      </div>
     </div>
     <div class="seller-orders-wrap" id="myInvoicesWrap">
       <div class="seller-orders-empty">لا توجد فواتير مرسلة بعد</div>
@@ -2059,7 +2063,13 @@ function renderMyInvoices(){
     wrap.innerHTML='<div class="seller-orders-empty">لا توجد فواتير مرسلة بعد</div>';
     return;
   }
-  wrap.innerHTML = [...myInvoices].reverse().map(o=>{
+  const searchVal = (document.getElementById('myInvoiceSearchInput')?.value||'').trim().toLowerCase();
+  const visible = searchVal ? myInvoices.filter(o=>(o.invoiceNumber||'').toLowerCase().includes(searchVal)) : myInvoices;
+  if(searchVal && visible.length===0){
+    wrap.innerHTML = `<div class="seller-orders-empty">لا توجد فواتير برقم يطابق "${esc(searchVal)}"</div>`;
+    return;
+  }
+  wrap.innerHTML = [...visible].reverse().map(o=>{
     const timeStr = o.time ? ` - ${o.time}` : '';
     const completionPart = o.completionDate ? ` • تاريخ الانتهاء: ${esc(isoToDMY(o.completionDate))}` : '';
     return `<div class="seller-order-card">
