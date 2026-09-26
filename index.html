@@ -896,6 +896,7 @@
     <div class="app-tabs">
       <button class="app-tab active" id="tab-new" onclick="switchTab('new')">📝 طلب جديد</button>
       <button class="app-tab" id="tab-myorders" onclick="switchTab('myorders')"><span id="ordersTabBadge"></span>طلباتي</button>
+      <button class="app-tab" id="tab-invoices" onclick="switchTab('invoices')">🧾 الفواتير</button>
     </div>
 
     <!-- TAB: NEW ORDER -->
@@ -917,14 +918,6 @@
         <select class="field-input" id="branchCode" onchange="updateSummary()">
           <option value="">اختر الفرع</option>
         </select>
-      </div>
-      <div class="field-group">
-        <label class="field-label">رقم الفاتورة <span style="font-weight:400;color:var(--text-light)">(اختياري)</span></label>
-        <input type="text" class="field-input" id="invoiceNumber" placeholder="أدخل رقم الفاتورة" oninput="updateSummary()">
-      </div>
-      <div class="field-group">
-        <label class="field-label">تاريخ الفاتورة</label>
-        <input type="text" class="field-input" id="invoiceDate" readonly disabled style="opacity:0.7;cursor:not-allowed;">
       </div>
     </div>
 
@@ -977,6 +970,43 @@
       <div class="seller-orders-empty">لا توجد طلبات مرسلة بعد</div>
     </div>
   </div><!-- end panel-myorders -->
+
+  <!-- TAB: INVOICES -->
+  <div class="app-tab-panel" id="panel-invoices">
+    <div class="section-header reveal" style="animation:fadeInDown 0.6s 0.1s ease both;">
+      <div class="section-label">مكارم •فخامة في كل التفاصيل</div>
+      <div class="section-title">إضافة فاتورة</div>
+    </div>
+    <div class="seller-card reveal">
+      <div class="field-group">
+        <label class="field-label"><span class="req-star">*</span> كود البائع</label>
+        <input type="text" class="field-input" id="invSellerCode" placeholder="أدخل كود البائع">
+      </div>
+      <div class="field-group">
+        <label class="field-label"><span class="req-star">*</span> كود الفرع</label>
+        <select class="field-input" id="invBranchCode">
+          <option value="">اختر الفرع</option>
+        </select>
+      </div>
+      <div class="field-group">
+        <label class="field-label"><span class="req-star">*</span> رقم الفاتورة</label>
+        <input type="text" class="field-input" id="invInvoiceNumber" placeholder="أدخل رقم الفاتورة">
+      </div>
+      <div class="field-group">
+        <label class="field-label">التاريخ</label>
+        <input type="text" class="field-input" id="invInvoiceDate" readonly disabled style="opacity:0.7;cursor:not-allowed;">
+      </div>
+    </div>
+    <div class="bottom-actions reveal">
+      <button class="btn-primary" onclick="submitInvoice()"><span>📨</span><span>إرسال للمدير</span></button>
+    </div>
+    <div class="section-header reveal" style="margin-top:32px;">
+      <div class="section-title" style="font-size:16px;">فواتيري المرسلة</div>
+    </div>
+    <div class="seller-orders-wrap" id="myInvoicesWrap">
+      <div class="seller-orders-empty">لا توجد فواتير مرسلة بعد</div>
+    </div>
+  </div><!-- end panel-invoices -->
 
   </div><!-- end main-panel -->
 
@@ -1078,19 +1108,21 @@ const LOGO_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAyAAAAEMCAYAAAA8
 // ══════════════════════════════════════════════════════
 const BRANCH_CODES = ['SQ04','SJ20','SD09','SK01','SJ13','SE04','SD14','SZ01','SR09','SJ27'];
 function populateBranchSelect(){
-  const sel = document.getElementById('branchCode');
-  if(!sel || sel.options.length>1) return;
-  BRANCH_CODES.forEach(code=>{
-    const opt = document.createElement('option');
-    opt.value = code; opt.textContent = code;
-    sel.appendChild(opt);
+  ['branchCode','invBranchCode'].forEach(id=>{
+    const sel = document.getElementById(id);
+    if(!sel || sel.options.length>1) return;
+    BRANCH_CODES.forEach(code=>{
+      const opt = document.createElement('option');
+      opt.value = code; opt.textContent = code;
+      sel.appendChild(opt);
+    });
   });
 }
 function setInvoiceDateToday(){
-  const el = document.getElementById('invoiceDate');
-  if(!el) return;
   const d = new Date();
-  el.value = `${d.getDate()}/${d.getMonth()+1}/${d.getFullYear()}`;
+  const dateStr = `${d.getDate()}/${d.getMonth()+1}/${d.getFullYear()}`;
+  const el = document.getElementById('invInvoiceDate');
+  if(el) el.value = dateStr;
 }
 
 // ══════════════════════════════════════════════════════
@@ -1588,13 +1620,12 @@ function toggleRequest(card,name){
 function updateSummary(){
   const sellerCode=document.getElementById('sellerCode').value;
   const branchCode=document.getElementById('branchCode').value;
-  const invoiceNumber=document.getElementById('invoiceNumber').value;
   const notes=document.getElementById('globalNotes').value;
   const body=document.getElementById('summaryContent');
   const empty=document.getElementById('summaryEmpty');
   document.getElementById('reqNum').textContent=appState.reqNumber;
 
-  const hasData=sellerCode||branchCode||invoiceNumber||Object.keys(appState.selections).some(k=>{
+  const hasData=sellerCode||branchCode||Object.keys(appState.selections).some(k=>{
     const s=appState.selections[k];
     return Object.values(s).some(v=>{ if(Array.isArray(v)) return v.length>0; return v&&v!==''&&v!==1; });
   })||appState.requestTypes.length>0;
@@ -1607,7 +1638,6 @@ function updateSummary(){
     html+=`<div class="summary-section"><div class="summary-section-title">معلومات الطلب</div><div class="summary-seller-info">`;
     if(sellerCode) html+=`<div class="summary-seller-row"><span class="summary-seller-key">كود البائع</span><span class="summary-seller-val">${esc(sellerCode)}</span></div>`;
     if(branchCode) html+=`<div class="summary-seller-row"><span class="summary-seller-key">كود الفرع</span><span class="summary-seller-val">${esc(branchCode)}</span></div>`;
-    if(invoiceNumber) html+=`<div class="summary-seller-row"><span class="summary-seller-key">رقم الفاتورة</span><span class="summary-seller-val">${esc(invoiceNumber)}</span></div>`;
     html+=`</div></div>`;
   }
 
@@ -1648,8 +1678,7 @@ function updateSummary(){
 function resetForm(){
   if(!confirm('هل أنت متأكد من إعادة تعيين جميع الاختيارات؟')) return;
   appState.selections={}; appState.requestTypes=[]; appState.reqNumber=generateReqNum();
-  ['sellerCode','branchCode','invoiceNumber','globalNotes'].forEach(id=>{ const el=document.getElementById(id); if(el) el.value=''; });
-  setInvoiceDateToday();
+  ['sellerCode','branchCode','globalNotes'].forEach(id=>{ const el=document.getElementById(id); if(el) el.value=''; });
   document.querySelectorAll('.category-item').forEach(item=>{
     item.classList.remove('active','has-selections');
     item.querySelector('.category-body').classList.remove('open');
@@ -1704,6 +1733,9 @@ function switchTab(tab){
   document.getElementById('panel-'+tab).classList.add('show');
   if(tab==='myorders'){
     renderSellerOrders();
+  }
+  if(tab==='invoices'){
+    renderMyInvoices();
   }
 }
 
@@ -1902,8 +1934,6 @@ async function submitOrder(){
     return;
   }
   const notes=document.getElementById('globalNotes').value;
-  const invoiceNumber=document.getElementById('invoiceNumber').value.trim();
-  const invoiceDate=document.getElementById('invoiceDate').value;
 
   // Check at least one product selected
   const hasSelections = Object.keys(appState.selections).some(k=>{
@@ -1942,12 +1972,10 @@ async function submitOrder(){
     time: timeStr,
     categories: cats,
     requestTypes: appState.requestTypes,
-    notes,
-    invoiceNumber: invoiceNumber||null,
-    invoiceDate: invoiceNumber ? invoiceDate : null
+    notes
   };
 
-  const submitBtn = document.querySelector('.bottom-actions .btn-primary');
+  const submitBtn = document.querySelector('#panel-new .btn-primary');
   if(submitBtn) submitBtn.disabled = true;
   try{
     await saveOrder(orderData);
@@ -1960,6 +1988,66 @@ async function submitOrder(){
   }finally{
     if(submitBtn) submitBtn.disabled = false;
   }
+}
+
+// ══════════════════════════════════════════════════════
+// INVOICES (quick standalone submission, sent to the manager
+// as a regular order row with no products/request type)
+// ══════════════════════════════════════════════════════
+async function submitInvoice(){
+  const sellerCode=document.getElementById('invSellerCode').value.trim();
+  const branchCode=document.getElementById('invBranchCode').value.trim();
+  const invoiceNumber=document.getElementById('invInvoiceNumber').value.trim();
+  if(!sellerCode||!branchCode||!invoiceNumber){
+    showToast('يرجى تعبئة كود البائع وكود الفرع ورقم الفاتورة','⚠️','toast-warning');
+    ['invSellerCode','invBranchCode','invInvoiceNumber'].forEach(id=>{ const el=document.getElementById(id); if(!el.value.trim()) el.classList.add('error'); });
+    return;
+  }
+  const now=new Date();
+  const dateStr=`${now.getDate()}/${now.getMonth()+1}/${now.getFullYear()}`;
+  const timeStr=`${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
+  const orderData = {
+    reqNumber: generateReqNum(),
+    sellerCode, branchCode,
+    date: dateStr, time: timeStr,
+    categories: [], requestTypes: [], notes: '',
+    invoiceNumber, invoiceDate: dateStr
+  };
+  const btn = document.querySelector('#panel-invoices .btn-primary');
+  if(btn) btn.disabled = true;
+  try{
+    await saveOrder(orderData);
+    showToast('تم إرسال الفاتورة للمدير بنجاح ✓','✓','toast-success');
+    document.getElementById('invInvoiceNumber').value='';
+    document.querySelectorAll('#panel-invoices .field-input.error').forEach(el=>el.classList.remove('error'));
+  }catch(err){
+    console.error('submitInvoice error', err);
+    showToast('تعذّر إرسال الفاتورة، تحقق من الإنترنت','⚠️','toast-warning');
+  }finally{
+    if(btn) btn.disabled = false;
+  }
+}
+
+function renderMyInvoices(){
+  const code = getSellerCode();
+  const wrap = document.getElementById('myInvoicesWrap');
+  if(!wrap) return;
+  const myInvoices = (code ? getOrders().filter(o=>o.sellerCode===code) : []).filter(o=>o.invoiceNumber);
+  if(myInvoices.length===0){
+    wrap.innerHTML='<div class="seller-orders-empty">لا توجد فواتير مرسلة بعد</div>';
+    return;
+  }
+  wrap.innerHTML = [...myInvoices].reverse().map(o=>{
+    const timeStr = o.time ? ` - ${o.time}` : '';
+    return `<div class="seller-order-card">
+      <div class="seller-order-head">
+        <div>
+          <div class="seller-order-num">🧾 ${esc(o.invoiceNumber)}</div>
+          <div class="seller-order-date">فرع ${esc(o.branchCode)||'—'} • ${esc(o.date)||'—'}${esc(timeStr)}</div>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
 }
 
 function formatKey(k){
@@ -2045,6 +2133,8 @@ function startApp(sellerCode){
   setTimeout(()=>{
     const sc = document.getElementById('sellerCode');
     if(sc){ sc.value=sellerCode; sc.readOnly=true; updateSummary(); }
+    const isc = document.getElementById('invSellerCode');
+    if(isc){ isc.value=sellerCode; isc.readOnly=true; }
     updateOrdersBadge();
   }, 2400);
 }
@@ -2453,6 +2543,9 @@ document.addEventListener('orders-updated', ()=>{
   }
   if(document.getElementById('panel-myorders')?.classList.contains('show')){
     renderSellerOrders();
+  }
+  if(document.getElementById('panel-invoices')?.classList.contains('show')){
+    renderMyInvoices();
   }
   updateOrdersBadge();
 });
