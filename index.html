@@ -610,11 +610,9 @@
     position:fixed; inset:0; z-index:9000; background:var(--cream);
     overflow-y:auto; display:none;
   }
-  #managerPage.show { display:block; animation: fadeInUp 0.5s ease both; }
+  #managerPage.show { display:block; }
   .manager-header {
     background:linear-gradient(135deg,var(--primary-dark),var(--primary));
-    background-size:200% 200%;
-    animation:gradientShift 6s ease infinite;
     padding:24px 28px; display:flex; align-items:center; justify-content:space-between;
     position:sticky; top:0; z-index:10;
     box-shadow: 0 4px 30px rgba(111,34,38,0.3);
@@ -622,11 +620,9 @@
   .manager-header::after {
     content:''; position:absolute; bottom:0; left:0; right:0; height:2px;
     background:linear-gradient(90deg,transparent,var(--gold),var(--secondary),var(--gold),transparent);
-    background-size:200% auto;
-    animation:shimmerSlide 3s linear infinite;
   }
-  .manager-title { color:white; font-size:20px; font-weight:800; animation: fadeInDown 0.5s ease both; }
-  .manager-sub { color:rgba(207,146,94,0.8); font-size:12px; letter-spacing:1px; animation:fadeInDown 0.5s 0.1s ease both; }
+  .manager-title { color:white; font-size:20px; font-weight:800; }
+  .manager-sub { color:rgba(207,146,94,0.8); font-size:12px; letter-spacing:1px; }
   .manager-logout {
     background:rgba(255,255,255,0.15); border:1px solid rgba(255,255,255,0.3);
     color:white; border-radius:50px; padding:9px 18px; font-family:'Tajawal',sans-serif;
@@ -640,21 +636,15 @@
     background:white; border-radius:20px; padding:24px; border:1px solid rgba(201,169,110,0.2);
     box-shadow:0 4px 20px rgba(111,34,38,0.06); text-align:center;
     transition:var(--transition);
-    animation: statPop 0.5s cubic-bezier(0.34,1.56,0.64,1) both;
     backdrop-filter:blur(10px);
     position:relative; overflow:hidden;
   }
-  .stat-card:nth-child(1){animation-delay:0.05s}
-  .stat-card:nth-child(2){animation-delay:0.1s}
-  .stat-card:nth-child(3){animation-delay:0.15s}
-  .stat-card:nth-child(4){animation-delay:0.2s}
   .stat-card::before {
     content:''; position:absolute; top:0; left:0; right:0; height:3px;
     background:linear-gradient(90deg,var(--primary),var(--secondary));
-    animation:shimmerSlide 4s linear infinite; background-size:200% auto;
   }
-  .stat-card:hover { transform:translateY(-6px) scale(1.02); box-shadow:0 16px 44px rgba(111,34,38,0.15); animation:glowPulse 1.5s ease infinite; }
-  .stat-num { font-size:36px; font-weight:900; color:var(--primary); animation: countUp 0.6s ease both; }
+  .stat-card:hover { transform:translateY(-6px) scale(1.02); box-shadow:0 16px 44px rgba(111,34,38,0.15); }
+  .stat-num { font-size:36px; font-weight:900; color:var(--primary); }
   .stat-label { font-size:12px; color:var(--text-light); font-weight:600; margin-top:4px; }
   .manager-tabs { display:flex; gap:8px; margin-bottom:18px; }
   .manager-tab {
@@ -668,7 +658,6 @@
   .manager-table-wrap {
     background:white; border-radius:20px; border:1px solid rgba(201,169,110,0.2);
     overflow:hidden; box-shadow:0 4px 20px rgba(111,34,38,0.06);
-    animation:slideInUp 0.5s 0.3s ease both;
   }
   .manager-table-header { padding:20px 24px; border-bottom:1px solid rgba(201,169,110,0.15); display:flex; align-items:center; justify-content:space-between; }
   .manager-table-title { font-size:16px; font-weight:800; color:var(--primary); }
@@ -683,16 +672,10 @@
   .req-table td { padding:14px 16px; border-bottom:1px solid rgba(201,169,110,0.08); font-size:13px; color:var(--text-dark); transition:background 0.2s; }
   .req-table tr:last-child td { border-bottom:none; }
   .req-table tr:hover td { background:rgba(111,34,38,0.03); transform-origin:right; }
-  .req-table tbody tr { animation:rowFadeIn 0.4s ease both; }
-  .req-table tbody tr:nth-child(1){animation-delay:0.05s}
-  .req-table tbody tr:nth-child(2){animation-delay:0.1s}
-  .req-table tbody tr:nth-child(3){animation-delay:0.15s}
-  .req-table tbody tr:nth-child(4){animation-delay:0.2s}
-  .req-table tbody tr:nth-child(5){animation-delay:0.25s}
   .req-badge { display:inline-block; padding:3px 10px; border-radius:50px; font-size:11px; font-weight:700; background:rgba(111,34,38,0.08); color:var(--primary); transition:var(--transition-fast); }
   .req-badge:hover { background:var(--primary); color:white; }
   .req-type-badge { display:inline-block; padding:3px 10px; border-radius:50px; font-size:11px; font-weight:700; background:rgba(207,146,94,0.12); color:var(--secondary-dark); margin:2px; transition:var(--transition-fast); }
-  .manager-empty { text-align:center; padding:60px; color:var(--text-light); font-size:15px; animation:fadeInUp 0.5s ease both; }
+  .manager-empty { text-align:center; padding:60px; color:var(--text-light); font-size:15px; }
   .req-detail-cell { max-width:280px; }
   .req-detail-chip { display:inline-block; background:rgba(111,34,38,0.06); border-radius:6px; padding:2px 8px; font-size:11px; margin:1px; }
   .clear-btn { padding:9px 18px; border-radius:50px; background:rgba(229,62,62,0.08); color:#e53e3e; border:1px solid rgba(229,62,62,0.2); font-family:'Tajawal',sans-serif; font-size:13px; font-weight:600; cursor:pointer; transition:var(--transition); }
@@ -983,7 +966,7 @@
 
     <div class="bottom-actions reveal">
       <button class="btn-secondary" onclick="resetForm()"><span>↺</span> إعادة تعيين</button>
-      <button class="btn-primary" onclick="submitOrder()"><span>📨</span><span>إرسال للمدير</span></button>
+      <button class="btn-primary" onclick="submitOrder()"><span>📨</span><span>إرسال</span></button>
     </div>
   </div><!-- end panel-new -->
 
@@ -1021,7 +1004,7 @@
       </div>
     </div>
     <div class="bottom-actions reveal">
-      <button class="btn-primary" onclick="submitInvoice()"><span>📨</span><span>إرسال للمدير</span></button>
+      <button class="btn-primary" onclick="submitInvoice()"><span>📨</span><span>إرسال</span></button>
     </div>
     <div class="section-header reveal" style="margin-top:32px;">
       <div class="section-title" style="font-size:16px;">فواتيري المرسلة</div>
@@ -1051,7 +1034,7 @@
       <div id="summaryContent" style="display:none"></div>
     </div>
     <div class="summary-footer">
-      <button class="export-btn" onclick="submitOrder()"><span>📨</span><span>إرسال للمدير</span></button>
+      <button class="export-btn" onclick="submitOrder()"><span>📨</span><span>إرسال</span></button>
     </div>
   </div>
 </div>
@@ -1061,7 +1044,7 @@
 <div class="success-overlay" id="successOverlay">
   <div class="success-card">
     <div class="success-icon">✓</div>
-    <div class="success-title">تم إرسال الطلب للمدير!</div>
+    <div class="success-title">تم إرسال الطلب!</div>
     <div class="success-sub" id="successReqNum">—</div>
     <button class="success-close" onclick="closeSuccess()">إغلاق</button>
   </div>
@@ -1846,7 +1829,7 @@ async function sellerSendReply(orderIdx){
     await authReady;
     await db.collection('orders').doc(order.id).update({ thread });
     input.value = '';
-    showToast('تم إرسال ردك للمدير','✓','toast-success');
+    showToast('تم إرسال ردك','✓','toast-success');
   }catch(err){
     console.error('sellerSendReply error', err);
     showToast('تعذّر إرسال الرد، تحقق من الإنترنت','⚠️','toast-warning');
@@ -2004,7 +1987,7 @@ async function submitOrder(){
     await saveOrder(orderData);
     document.getElementById('successReqNum').textContent = `رقم الطلب: ${appState.reqNumber}`;
     document.getElementById('successOverlay').classList.add('show');
-    showToast('تم إرسال الطلب للمدير بنجاح ✓','✓','toast-success');
+    showToast('تم إرسال الطلب بنجاح ✓','✓','toast-success');
   }catch(err){
     console.error('submitOrder error', err);
     showToast('تعذّر إرسال الطلب، تحقق من الإنترنت وحاول مجددًا','⚠️','toast-warning');
@@ -2040,7 +2023,7 @@ async function submitInvoice(){
   if(btn) btn.disabled = true;
   try{
     await saveOrder(orderData);
-    showToast('تم إرسال الفاتورة للمدير بنجاح ✓','✓','toast-success');
+    showToast('تم إرسال الفاتورة بنجاح ✓','✓','toast-success');
     document.getElementById('invInvoiceNumber').value='';
     document.querySelectorAll('#panel-invoices .field-input.error').forEach(el=>el.classList.remove('error'));
   }catch(err){
