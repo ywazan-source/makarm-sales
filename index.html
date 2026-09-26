@@ -250,7 +250,7 @@
 
   /* LAYOUT */
   .app-layout { display:grid; grid-template-columns:1fr 340px; gap:0; min-height:calc(100vh - 116px); position:relative; z-index:1; }
-  .main-panel { padding:28px 32px; overflow-y:auto; max-height:calc(100vh - 116px); }
+  .main-panel { padding:28px 32px; overflow-y:auto; max-height:calc(100vh - 116px); box-sizing:border-box; }
 
   .section-header { margin-bottom:24px; }
   .section-label { font-size:11px;letter-spacing:3px;text-transform:uppercase;color:var(--secondary);font-weight:700;margin-bottom:6px; }
@@ -1638,7 +1638,7 @@ function updateSummary(){
     return Object.values(s).some(v=>{ if(Array.isArray(v)) return v.length>0; return v&&v!==''&&v!==1; });
   })||appState.requestTypes.length>0;
 
-  if(!hasData){ body.style.display='none'; empty.style.display='flex'; return; }
+  if(!hasData){ body.style.display='none'; empty.style.display='flex'; syncMobileSummaryPadding(); return; }
   body.style.display='block'; empty.style.display='none';
 
   let html='';
@@ -1678,6 +1678,19 @@ function updateSummary(){
   }
   if(notes) html+=`<div class="summary-section"><div class="summary-section-title">ملاحظات</div><div class="summary-item"><div class="summary-item-detail" style="color:rgba(255,255,255,0.55)">${notes}</div></div></div>`;
   body.innerHTML=html;
+  syncMobileSummaryPadding();
+}
+
+// On narrow screens the summary panel docks fixed to the bottom of the
+// viewport; measure its real height so the scrollable form content
+// always clears it instead of guessing with a vh-based padding.
+function syncMobileSummaryPadding(){
+  const mainPanel = document.getElementById('mainPanel');
+  const summaryPanel = document.querySelector('.summary-panel');
+  if(!mainPanel || !summaryPanel) return;
+  if(window.innerWidth > 1024){ mainPanel.style.paddingBottom=''; return; }
+  const h = summaryPanel.getBoundingClientRect().height;
+  mainPanel.style.paddingBottom = (h + 32) + 'px';
 }
 
 // ══════════════════════════════════════════════════════
@@ -2588,6 +2601,8 @@ window.addEventListener('DOMContentLoaded',()=>{
   buildCategories();
   setupReveal();
   setupTabsAutoHide();
+  syncMobileSummaryPadding();
+  window.addEventListener('resize', syncMobileSummaryPadding);
   setTimeout(()=>{ document.getElementById('loadingScreen').classList.add('hidden'); },2200);
 
   // Check session
