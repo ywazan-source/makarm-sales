@@ -656,6 +656,15 @@
   .stat-card:hover { transform:translateY(-6px) scale(1.02); box-shadow:0 16px 44px rgba(111,34,38,0.15); animation:glowPulse 1.5s ease infinite; }
   .stat-num { font-size:36px; font-weight:900; color:var(--primary); animation: countUp 0.6s ease both; }
   .stat-label { font-size:12px; color:var(--text-light); font-weight:600; margin-top:4px; }
+  .manager-tabs { display:flex; gap:8px; margin-bottom:18px; }
+  .manager-tab {
+    padding:12px 26px; border-radius:50px; border:1.5px solid rgba(201,169,110,0.3);
+    background:white; color:var(--text-mid); font-family:'Tajawal',sans-serif; font-size:14px; font-weight:700;
+    cursor:pointer; transition:var(--transition);
+  }
+  .manager-tab.active { background:var(--primary); border-color:var(--primary); color:white; }
+  .manager-tab-panel { display:none; }
+  .manager-tab-panel.show { display:block; }
   .manager-table-wrap {
     background:white; border-radius:20px; border:1px solid rgba(201,169,110,0.2);
     overflow:hidden; box-shadow:0 4px 20px rgba(111,34,38,0.06);
@@ -824,19 +833,33 @@
   </div>
   <div class="manager-body">
     <div class="manager-stats" id="managerStats"></div>
-    <div class="manager-table-wrap">
-      <div class="manager-table-header">
-        <div class="manager-table-title">📋 سجل الطلبات</div>
-        <div class="search-wrap">
-          <span class="search-icon">🔍</span>
-          <input type="text" class="search-input" id="invoiceSearchInput" placeholder="بحث برقم الفاتورة" oninput="renderManagerTable()">
+    <div class="manager-tabs">
+      <button class="manager-tab active" id="mtab-orders" onclick="switchManagerTab('orders')">📋 الطلبات</button>
+      <button class="manager-tab" id="mtab-invoices" onclick="switchManagerTab('invoices')">🧾 الفواتير</button>
+    </div>
+    <div class="manager-tab-panel show" id="mpanel-orders">
+      <div class="manager-table-wrap">
+        <div class="manager-table-header">
+          <div class="manager-table-title">📋 سجل الطلبات</div>
+          <div style="display:flex;gap:10px;align-items:center;">
+            <button class="clear-btn" onclick="clearAllOrders()">🗑 مسح الكل</button>
+            <button class="manager-export-btn" onclick="exportManagerPDF()">📄 تصدير PDF</button>
+          </div>
         </div>
-        <div style="display:flex;gap:10px;align-items:center;">
-          <button class="clear-btn" onclick="clearAllOrders()">🗑 مسح الكل</button>
-          <button class="manager-export-btn" onclick="exportManagerPDF()">📄 تصدير PDF</button>
-        </div>
+        <div id="managerTableBody"></div>
       </div>
-      <div id="managerTableBody"></div>
+    </div>
+    <div class="manager-tab-panel" id="mpanel-invoices">
+      <div class="manager-table-wrap">
+        <div class="manager-table-header">
+          <div class="manager-table-title">🧾 سجل الفواتير</div>
+          <div class="search-wrap">
+            <span class="search-icon">🔍</span>
+            <input type="text" class="search-input" id="invoiceSearchInput" placeholder="بحث برقم الفاتورة" oninput="renderManagerInvoicesTable()">
+          </div>
+        </div>
+        <div id="managerInvoicesBody"></div>
+      </div>
     </div>
   </div>
 </div>
@@ -2098,7 +2121,7 @@ function setupTabsAutoHide(){
 // ══════════════════════════════════════════════════════
 // AUTH & MANAGER SYSTEM
 // ══════════════════════════════════════════════════════
-const MANAGER_CODE = 'D1762';
+const MANAGER_CODE = 'D1672';
 // Seller codes - any non-empty code is accepted as a seller
 // Sellers use their own code as password
 
@@ -2168,13 +2191,21 @@ function showManagerPage(){
   renderManagerTable();
 }
 
+function switchManagerTab(tab){
+  document.querySelectorAll('.manager-tab').forEach(t=>t.classList.remove('active'));
+  document.querySelectorAll('.manager-tab-panel').forEach(p=>p.classList.remove('show'));
+  document.getElementById('mtab-'+tab).classList.add('active');
+  document.getElementById('mpanel-'+tab).classList.add('show');
+  if(tab==='invoices') renderManagerInvoicesTable();
+}
+
 function renderManagerTable(){
-  const orders = getOrders();
+  const allOrders = getOrders();
+  const orders = allOrders.filter(o=>!o.invoiceNumber);
   // Stats
   const statsEl = document.getElementById('managerStats');
   const sellers = [...new Set(orders.map(o=>o.sellerCode))];
   const branches = [...new Set(orders.map(o=>o.branchCode))];
-  const today = new Date().toLocaleDateString('ar-SA');
   const todayOrders = orders.filter(o=>o.date && o.date.includes(new Date().toLocaleDateString('en-GB')));
   statsEl.innerHTML=`
     <div class="stat-card"><div class="stat-num">${orders.length}</div><div class="stat-label">إجمالي الطلبات</div></div>
@@ -2188,25 +2219,18 @@ function renderManagerTable(){
     body.innerHTML='<div class="manager-empty">لا توجد طلبات مسجلة بعد</div>';
     return;
   }
-  const searchVal = (document.getElementById('invoiceSearchInput')?.value||'').trim().toLowerCase();
-  const visibleOrders = searchVal ? orders.filter(o=>(o.invoiceNumber||'').toLowerCase().includes(searchVal)) : orders;
-  if(searchVal && visibleOrders.length===0){
-    body.innerHTML = `<div class="manager-empty">لا توجد طلبات برقم فاتورة يطابق "${esc(searchVal)}"</div>`;
-    return;
-  }
-  const rows = [...visibleOrders].reverse().map(o=>{
+  const rows = [...orders].reverse().map(o=>{
     const cats = o.categories||[];
     const catChips = cats.map(c=>`<span class="req-detail-chip">${c.name} ×${c.qty||1}</span>`).join('');
     const reqTypes = (o.requestTypes||[]).map(t=>`<span class="req-type-badge">${t}</span>`).join('');
     const timeStr = o.time ? ` - ${o.time}` : '';
-    const idx = orders.findIndex(x=>x.id===o.id);
+    const idx = allOrders.findIndex(x=>x.id===o.id);
     const hasNewReply = o.thread && o.thread.some(m=>m.from==='seller');
     const replyIndicator = hasNewReply ? `<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#f59e0b;margin-left:4px;" title="رد من البائع"></span>` : '';
     return `<tr>
       <td><span class="req-badge">${esc(o.reqNumber)||'—'}</span></td>
       <td><strong>${esc(o.sellerCode)||'—'}</strong></td>
       <td>${esc(o.branchCode)||'—'}</td>
-      <td>${esc(o.invoiceNumber)||'—'}</td>
       <td style="white-space:nowrap">${esc(o.date)||'—'}${esc(timeStr)}</td>
       <td class="req-detail-cell">${catChips||'—'}</td>
       <td>${reqTypes||'—'}</td>
@@ -2216,8 +2240,43 @@ function renderManagerTable(){
   }).join('');
   body.innerHTML=`<table class="req-table">
     <thead><tr>
-      <th>رقم الطلب</th><th>كود البائع</th><th>الفرع</th><th>رقم الفاتورة</th><th>التاريخ</th>
+      <th>رقم الطلب</th><th>كود البائع</th><th>الفرع</th><th>التاريخ</th>
       <th>المنتجات</th><th>نوع الطلب</th><th>ملاحظات</th><th>رد</th>
+    </tr></thead>
+    <tbody>${rows}</tbody>
+  </table>`;
+}
+
+function renderManagerInvoicesTable(){
+  const allOrders = getOrders();
+  const invoices = allOrders.filter(o=>o.invoiceNumber);
+  const body = document.getElementById('managerInvoicesBody');
+  if(invoices.length===0){
+    body.innerHTML='<div class="manager-empty">لا توجد فواتير مسجلة بعد</div>';
+    return;
+  }
+  const searchVal = (document.getElementById('invoiceSearchInput')?.value||'').trim().toLowerCase();
+  const visible = searchVal ? invoices.filter(o=>(o.invoiceNumber||'').toLowerCase().includes(searchVal)) : invoices;
+  if(searchVal && visible.length===0){
+    body.innerHTML = `<div class="manager-empty">لا توجد فواتير برقم يطابق "${esc(searchVal)}"</div>`;
+    return;
+  }
+  const rows = [...visible].reverse().map(o=>{
+    const timeStr = o.time ? ` - ${o.time}` : '';
+    const idx = allOrders.findIndex(x=>x.id===o.id);
+    const hasNewReply = o.thread && o.thread.some(m=>m.from==='seller');
+    const replyIndicator = hasNewReply ? `<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#f59e0b;margin-left:4px;" title="رد من البائع"></span>` : '';
+    return `<tr>
+      <td><span class="req-badge">${esc(o.invoiceNumber)}</span></td>
+      <td><strong>${esc(o.sellerCode)||'—'}</strong></td>
+      <td>${esc(o.branchCode)||'—'}</td>
+      <td style="white-space:nowrap">${esc(o.date)||'—'}${esc(timeStr)}</td>
+      <td>${replyIndicator}<button onclick="showOrderDetail(${idx})" style="background:rgba(111,34,38,0.08);border:1px solid rgba(111,34,38,0.15);color:var(--primary);border-radius:8px;padding:5px 12px;font-family:Tajawal,sans-serif;font-size:12px;font-weight:600;cursor:pointer;">رد / تفاصيل</button></td>
+    </tr>`;
+  }).join('');
+  body.innerHTML=`<table class="req-table">
+    <thead><tr>
+      <th>رقم الفاتورة</th><th>كود البائع</th><th>الفرع</th><th>التاريخ</th><th>رد</th>
     </tr></thead>
     <tbody>${rows}</tbody>
   </table>`;
@@ -2384,7 +2443,7 @@ function exportOrderPDF(o){
 function exportManagerPDF(){
   const { jsPDF } = window.jspdf;
   const doc = new jsPDF({orientation:'landscape',unit:'mm',format:'a4'});
-  const orders = getOrders();
+  const orders = getOrders().filter(o=>!o.invoiceNumber);
   const pw=doc.internal.pageSize.getWidth(), ph=doc.internal.pageSize.getHeight();
   const pRed=[111,34,38], pGold=[201,169,110], pWhite=[255,255,255], pDark=[44,24,16], pCream=[250,246,240];
   doc.setFillColor(...pCream); doc.rect(0,0,pw,ph,'F');
@@ -2395,7 +2454,7 @@ function exportManagerPDF(){
   doc.setFontSize(8); doc.setTextColor(...pWhite);
   doc.text(`تاريخ التصدير: ${dateStr}`, pw-10, 14, {align:'right'});
   if(orders.length===0){ doc.setTextColor(...pDark); doc.setFontSize(12); doc.text('لا توجد طلبات',pw/2,60,{align:'center'}); doc.save('MAKARM-Manager-Report.pdf'); return; }
-  const cols=[{h:'رقم الطلب',w:32},{h:'كود البائع',w:24},{h:'الفرع',w:22},{h:'رقم الفاتورة',w:26},{h:'التاريخ',w:24},{h:'المنتجات',w:55},{h:'نوع الطلب',w:36},{h:'ملاحظات',w:38}];
+  const cols=[{h:'رقم الطلب',w:35},{h:'كود البائع',w:28},{h:'الفرع',w:28},{h:'التاريخ',w:28},{h:'المنتجات',w:60},{h:'نوع الطلب',w:40},{h:'ملاحظات',w:40}];
   let curY=28; const rowH=9;
   // Header row
   doc.setFillColor(...pGold); let cx=10;
@@ -2412,7 +2471,7 @@ function exportManagerPDF(){
     cols.forEach(c=>{ doc.rect(cx,curY,c.w,rowH,'S'); cx+=c.w; });
     const cats=(o.categories||[]).map(c=>`${c.name}(${c.qty||1})`).join(', ');
     const rTypes=(o.requestTypes||[]).join(', ');
-    const vals=[o.reqNumber||'',o.sellerCode||'',o.branchCode||'',o.invoiceNumber||'',o.date||'',cats,rTypes,o.notes||''];
+    const vals=[o.reqNumber||'',o.sellerCode||'',o.branchCode||'',o.date||'',cats,rTypes,o.notes||''];
     doc.setFont('helvetica','normal'); doc.setFontSize(7); doc.setTextColor(...pDark);
     cx=10; vals.forEach((v,vi)=>{ doc.text(String(v), cx+cols[vi].w/2, curY+6,{align:'center',maxWidth:cols[vi].w-2}); cx+=cols[vi].w; });
     curY+=rowH;
@@ -2536,6 +2595,9 @@ window.addEventListener('DOMContentLoaded',()=>{
 document.addEventListener('orders-updated', ()=>{
   if(document.getElementById('managerPage')?.classList.contains('show')){
     renderManagerTable();
+    if(document.getElementById('mpanel-invoices')?.classList.contains('show')){
+      renderManagerInvoicesTable();
+    }
     if(document.getElementById('orderDetailOverlay')?.classList.contains('show')){
       const openIdx = window.__openOrderDetailIdx;
       if(openIdx!=null) showOrderDetail(openIdx);
