@@ -843,6 +843,11 @@
             <span class="search-icon">🔍</span>
             <input type="text" class="search-input" id="invoiceSearchInput" placeholder="بحث برقم الفاتورة" oninput="renderManagerInvoicesTable()">
           </div>
+          <select class="field-input" id="invoiceRegisteredFilter" onchange="renderManagerInvoicesTable()" style="padding:8px 14px;font-size:13px;width:auto;">
+            <option value="all">تم التسجيل: الكل</option>
+            <option value="yes">✓ تم التسجيل</option>
+            <option value="no">☐ غير مسجل</option>
+          </select>
         </div>
         <div id="managerInvoicesBody"></div>
       </div>
@@ -2299,12 +2304,18 @@ function renderManagerInvoicesTable(){
     return;
   }
   const searchVal = (document.getElementById('invoiceSearchInput')?.value||'').trim().toLowerCase();
-  const visible = searchVal ? invoices.filter(o=>(o.invoiceNumber||'').toLowerCase().includes(searchVal)) : invoices;
-  if(searchVal && visible.length===0){
-    body.innerHTML = `<div class="manager-empty">لا توجد فواتير برقم يطابق "${esc(searchVal)}"</div>`;
+  const regFilter = document.getElementById('invoiceRegisteredFilter')?.value || 'all';
+  let visible = searchVal ? invoices.filter(o=>(o.invoiceNumber||'').toLowerCase().includes(searchVal)) : invoices;
+  if(regFilter==='yes') visible = visible.filter(o=>o.registered);
+  if(regFilter==='no') visible = visible.filter(o=>!o.registered);
+  if(visible.length===0){
+    body.innerHTML = `<div class="manager-empty">لا توجد فواتير مطابقة</div>`;
     return;
   }
-  const rows = [...visible].reverse().map(o=>{
+  let ordered = [...visible].reverse();
+  if(invoiceRegisteredSort) ordered.sort((a,b)=>(invoiceRegisteredSort==='asc'?1:-1)*((a.registered?1:0)-(b.registered?1:0)));
+  const sortArrow = invoiceRegisteredSort==='asc' ? ' ▲' : invoiceRegisteredSort==='desc' ? ' ▼' : ' ⇅';
+  const rows = ordered.map(o=>{
     const timeStr = o.time ? ` - ${o.time}` : '';
     const idx = allOrders.findIndex(x=>x.id===o.id);
     const hasNewReply = o.thread && o.thread.some(m=>m.from==='seller');
@@ -2314,6 +2325,7 @@ function renderManagerInvoicesTable(){
       <td><strong>${esc(o.sellerCode)||'—'}</strong></td>
       <td>${esc(o.branchCode)||'—'}</td>
       <td style="white-space:nowrap">${esc(o.date)||'—'}${esc(timeStr)}</td>
+      <td style="text-align:center"><input type="checkbox" style="width:18px;height:18px;cursor:pointer;" ${o.registered?'checked':''} onchange="setInvoiceRegistered('${o.id}', this.checked)" title="تم التسجيل"></td>
       <td><input type="date" class="field-input" style="padding:6px 10px;font-size:12px;" value="${esc(o.completionDate)||''}" onchange="setInvoiceCompletionDate('${o.id}', this.value)"></td>
       <td style="text-align:center"><input type="checkbox" style="width:18px;height:18px;cursor:pointer;" ${o.completed?'checked':''} onchange="setInvoiceCompleted('${o.id}', this.checked)" title="تمت من قبل المدير"></td>
       <td style="white-space:nowrap">${replyIndicator}<button onclick="showOrderDetail(${idx})" style="background:rgba(111,34,38,0.08);border:1px solid rgba(111,34,38,0.15);color:var(--primary);border-radius:8px;padding:5px 12px;font-family:Tajawal,sans-serif;font-size:12px;font-weight:600;cursor:pointer;">رد / تفاصيل</button> <button onclick="hideOrderForManager('${o.id}')" title="حذف من عندي" style="background:rgba(229,62,62,0.08);border:1px solid rgba(229,62,62,0.2);color:#e53e3e;border-radius:8px;padding:5px 10px;font-family:Tajawal,sans-serif;font-size:12px;font-weight:600;cursor:pointer;">🗑</button></td>
@@ -2321,7 +2333,7 @@ function renderManagerInvoicesTable(){
   }).join('');
   body.innerHTML=`<table class="req-table">
     <thead><tr>
-      <th>رقم الفاتورة</th><th>كود البائع</th><th>الفرع</th><th>التاريخ</th><th>تاريخ الانتهاء</th><th>تم</th><th>رد</th>
+      <th>رقم الفاتورة</th><th>كود البائع</th><th>الفرع</th><th>التاريخ</th><th style="cursor:pointer;user-select:none;" onclick="toggleInvoiceRegisteredSort()" title="فرز">تم التسجيل${sortArrow}</th><th>تاريخ الانتهاء</th><th>تم</th><th>رد</th>
     </tr></thead>
     <tbody>${rows}</tbody>
   </table>`;
@@ -2334,6 +2346,20 @@ async function setInvoiceCompletionDate(orderId, value){
     showToast('تم حفظ تاريخ الانتهاء ✓','✓','toast-success');
   }catch(err){
     console.error('setInvoiceCompletionDate error', err);
+    showToast('تعذّر الحفظ، تحقق من الإنترنت','⚠️','toast-warning');
+  }
+}
+let invoiceRegisteredSort = null; // null | 'desc' (registered first) | 'asc'
+function toggleInvoiceRegisteredSort(){
+  invoiceRegisteredSort = invoiceRegisteredSort===null ? 'desc' : invoiceRegisteredSort==='desc' ? 'asc' : null;
+  renderManagerInvoicesTable();
+}
+async function setInvoiceRegistered(orderId, checked){
+  try{
+    await authReady;
+    await db.collection('orders').doc(orderId).update({ registered: checked });
+  }catch(err){
+    console.error('setInvoiceRegistered error', err);
     showToast('تعذّر الحفظ، تحقق من الإنترنت','⚠️','toast-warning');
   }
 }
