@@ -656,6 +656,7 @@
     cursor:pointer; transition:var(--transition);
   }
   .manager-tab.active { background:var(--primary); border-color:var(--primary); color:white; }
+  .credit-footer { text-align:center; font-size:11px; color:var(--text-light); opacity:0.75; padding:22px 0 8px; }
   .manager-tab-panel { display:none; }
   .manager-tab-panel.show { display:block; }
   .manager-table-wrap {
@@ -834,6 +835,7 @@
         </div>
         <div id="managerTableBody"></div>
       </div>
+      <div class="credit-footer">تم التصميم والإنشاء بواسطة يمان وزان</div>
     </div>
     <div class="manager-tab-panel" id="mpanel-invoices">
       <div class="manager-table-wrap">
@@ -851,6 +853,7 @@
         </div>
         <div id="managerInvoicesBody"></div>
       </div>
+      <div class="credit-footer">تم التصميم والإنشاء بواسطة يمان وزان</div>
     </div>
   </div>
 </div>
@@ -976,6 +979,7 @@
       <button class="btn-secondary" onclick="resetForm()"><span>↺</span> إعادة تعيين</button>
       <button class="btn-primary" onclick="submitOrder()"><span>📨</span><span>إرسال</span></button>
     </div>
+    <div class="credit-footer">تم التصميم والإنشاء بواسطة يمان وزان</div>
   </div><!-- end panel-new -->
 
   <!-- TAB: MY ORDERS -->
@@ -983,6 +987,7 @@
     <div class="seller-orders-wrap" id="sellerOrdersWrap">
       <div class="seller-orders-empty">لا توجد طلبات مرسلة بعد</div>
     </div>
+    <div class="credit-footer">تم التصميم والإنشاء بواسطة يمان وزان</div>
   </div><!-- end panel-myorders -->
 
   <!-- TAB: INVOICES -->
@@ -1024,6 +1029,7 @@
     <div class="seller-orders-wrap" id="myInvoicesWrap">
       <div class="seller-orders-empty">لا توجد فواتير مرسلة بعد</div>
     </div>
+    <div class="credit-footer">تم التصميم والإنشاء بواسطة يمان وزان</div>
   </div><!-- end panel-invoices -->
 
   </div><!-- end main-panel -->
@@ -2333,7 +2339,7 @@ function renderManagerInvoicesTable(){
   }).join('');
   body.innerHTML=`<table class="req-table">
     <thead><tr>
-      <th>رقم الفاتورة</th><th>كود البائع</th><th>الفرع</th><th>التاريخ</th><th style="cursor:pointer;user-select:none;" onclick="toggleInvoiceRegisteredSort()" title="فرز">تم التسجيل${sortArrow}</th><th>تاريخ الانتهاء</th><th>تم</th><th>رد</th>
+      <th>رقم الفاتورة</th><th>كود البائع</th><th>الفرع</th><th>التاريخ</th><th style="cursor:pointer;user-select:none;" onclick="toggleInvoiceRegisteredSort()" title="فرز">تم التسجيل${sortArrow}</th><th>تاريخ الانتهاء</th><th>تم الانتهاء</th><th>رد</th>
     </tr></thead>
     <tbody>${rows}</tbody>
   </table>`;
