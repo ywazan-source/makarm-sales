@@ -829,6 +829,11 @@
         <div class="manager-table-header">
           <div class="manager-table-title">📋 سجل الطلبات</div>
           <div style="display:flex;gap:10px;align-items:center;">
+            <select class="field-input" id="orderReplyFilter" onchange="renderManagerTable()" style="padding:8px 14px;font-size:13px;width:auto;">
+              <option value="all">حالة الرد: الكل</option>
+              <option value="yes">✓ تم الرد</option>
+              <option value="no">⏳ لم يتم الرد</option>
+            </select>
             <button class="clear-btn" onclick="clearAllOrders()">🗑 مسح الكل</button>
             <button class="manager-export-btn" onclick="exportManagerPDF()">📄 تصدير PDF</button>
           </div>
@@ -984,6 +989,13 @@
 
   <!-- TAB: MY ORDERS -->
   <div class="app-tab-panel" id="panel-myorders">
+    <div style="display:flex;justify-content:flex-end;padding:20px 20px 0;">
+      <select class="field-input" id="myOrderReplyFilter" onchange="renderSellerOrders()" style="padding:8px 14px;font-size:13px;width:auto;">
+        <option value="all">حالة الرد: الكل</option>
+        <option value="yes">✓ تم الرد</option>
+        <option value="no">⏳ لم يتم الرد</option>
+      </select>
+    </div>
     <div class="seller-orders-wrap" id="sellerOrdersWrap">
       <div class="seller-orders-empty">لا توجد طلبات مرسلة بعد</div>
     </div>
@@ -1798,7 +1810,16 @@ function renderSellerOrders(){
     return;
   }
   const idx = allOrders.reduce((acc,o,i)=>{ acc[o.reqNumber]=i; return acc; },{});
-  wrap.innerHTML = [...myOrders].reverse().map(o=>{
+  const replyFilter = document.getElementById('myOrderReplyFilter')?.value || 'all';
+  let shown = myOrders;
+  if(replyFilter==='yes') shown = myOrders.filter(hasManagerReply);
+  if(replyFilter==='no') shown = myOrders.filter(o=>!hasManagerReply(o));
+  if(shown.length===0){
+    wrap.innerHTML='<div class="seller-orders-empty">لا توجد طلبات مطابقة</div>';
+    markManagerMsgSeen(code);
+    return;
+  }
+  wrap.innerHTML = [...shown].reverse().map(o=>{
     const i = idx[o.reqNumber];
     const cats = (o.categories||[]).map(c=>`<span class="seller-order-chip">${c.name} ×${c.qty||1}</span>`).join('');
     const hasReply = o.thread && o.thread.some(m=>m.from==='manager');
@@ -2273,7 +2294,15 @@ function renderManagerTable(){
     body.innerHTML='<div class="manager-empty">لا توجد طلبات مسجلة بعد</div>';
     return;
   }
-  const rows = [...orders].reverse().map(o=>{
+  const replyFilter = document.getElementById('orderReplyFilter')?.value || 'all';
+  let visibleOrders = orders;
+  if(replyFilter==='yes') visibleOrders = orders.filter(hasManagerReply);
+  if(replyFilter==='no') visibleOrders = orders.filter(o=>!hasManagerReply(o));
+  if(visibleOrders.length===0){
+    body.innerHTML='<div class="manager-empty">لا توجد طلبات مطابقة</div>';
+    return;
+  }
+  const rows = [...visibleOrders].reverse().map(o=>{
     const cats = o.categories||[];
     const catChips = cats.map(c=>`<span class="req-detail-chip">${c.name} ×${c.qty||1}</span>`).join('');
     const reqTypes = (o.requestTypes||[]).map(t=>`<span class="req-type-badge">${t}</span>`).join('');
@@ -2289,16 +2318,26 @@ function renderManagerTable(){
       <td class="req-detail-cell">${catChips||'—'}</td>
       <td>${reqTypes||'—'}</td>
       <td style="max-width:140px;font-size:12px;color:var(--text-mid);">${esc(o.notes)||'—'}</td>
+      <td style="white-space:nowrap">${replyStatusBadge(o)}</td>
       <td style="white-space:nowrap">${replyIndicator}<button onclick="showOrderDetail(${idx})" style="background:rgba(111,34,38,0.08);border:1px solid rgba(111,34,38,0.15);color:var(--primary);border-radius:8px;padding:5px 12px;font-family:Tajawal,sans-serif;font-size:12px;font-weight:600;cursor:pointer;">رد / تفاصيل</button> <button onclick="hideOrderForManager('${o.id}')" title="حذف من عندي" style="background:rgba(229,62,62,0.08);border:1px solid rgba(229,62,62,0.2);color:#e53e3e;border-radius:8px;padding:5px 10px;font-family:Tajawal,sans-serif;font-size:12px;font-weight:600;cursor:pointer;">🗑</button></td>
     </tr>`;
   }).join('');
   body.innerHTML=`<table class="req-table">
     <thead><tr>
       <th>رقم الطلب</th><th>كود البائع</th><th>الفرع</th><th>التاريخ</th>
-      <th>المنتجات</th><th>نوع الطلب</th><th>ملاحظات</th><th>رد</th>
+      <th>المنتجات</th><th>نوع الطلب</th><th>ملاحظات</th><th>حالة الرد</th><th>رد</th>
     </tr></thead>
     <tbody>${rows}</tbody>
   </table>`;
+}
+
+function hasManagerReply(o){
+  return !!(o.thread && o.thread.some(m=>m.from==='manager'));
+}
+function replyStatusBadge(o){
+  return hasManagerReply(o)
+    ? '<span style="display:inline-block;padding:3px 10px;border-radius:50px;font-size:11px;font-weight:700;background:rgba(34,197,94,0.12);color:#15803d;">✓ تم الرد</span>'
+    : '<span style="display:inline-block;padding:3px 10px;border-radius:50px;font-size:11px;font-weight:700;background:rgba(245,158,11,0.12);color:#b45309;">⏳ لم يتم الرد</span>';
 }
 
 function renderManagerInvoicesTable(){
