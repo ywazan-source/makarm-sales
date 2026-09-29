@@ -2104,13 +2104,17 @@ function renderMyInvoices(){
   }
   wrap.innerHTML = [...visible].reverse().map(o=>{
     const timeStr = o.time ? ` - ${o.time}` : '';
-    const completionPart = o.completionDate ? ` • تاريخ الانتهاء: ${esc(isoToDMY(o.completionDate))}` : '';
+    const completionCol = `<div style="text-align:center;padding:6px 14px;border-radius:12px;background:${o.completionDate?'rgba(111,34,38,0.06)':'transparent'};border:1px solid rgba(201,169,110,0.25);min-width:110px;">
+        <div style="font-size:11px;color:var(--text-light);font-weight:600;">تاريخ الانتهاء</div>
+        <div style="font-size:15px;font-weight:800;color:var(--primary);margin-top:2px;">${o.completionDate?esc(isoToDMY(o.completionDate)):'—'}</div>
+      </div>`;
     return `<div class="seller-order-card">
       <div class="seller-order-head">
         <div>
           <div class="seller-order-num">🧾 ${esc(o.invoiceNumber)}</div>
-          <div class="seller-order-date">فرع ${esc(o.branchCode)||'—'} • ${esc(o.date)||'—'}${esc(timeStr)}${completionPart}</div>
+          <div class="seller-order-date">فرع ${esc(o.branchCode)||'—'} • ${esc(o.date)||'—'}${esc(timeStr)}</div>
         </div>
+        ${completionCol}
         <div class="seller-order-status">
           <div class="status-dot${o.completed?' has-reply':''}"></div>
           <span class="status-label${o.completed?' has-reply':''}">${o.completed?'منتهية':'قيد المعالجة'}</span>
