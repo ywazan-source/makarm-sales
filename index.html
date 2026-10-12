@@ -802,11 +802,24 @@
       <img id="loginLogoImg" src="" alt="MAKARM">
     </div>
     <div class="login-title">مكارم — فخامة في كل التفاصيل</div>
-    <div class="login-sub">أدخل الكود الوظيفي للدخول</div>
-    <input type="text" class="login-input" id="loginCodeInput" placeholder="الكود الوظيفي" maxlength="10" autocomplete="off"
-      oninput="this.value=this.value.toUpperCase()" onkeydown="if(event.key==='Enter')doLogin()">
-    <div class="login-error" id="loginError"></div>
-    <button class="login-btn" onclick="doLogin()">دخول ✦</button>
+    <div id="loginCodeStep">
+      <div class="login-sub">أدخل الكود الوظيفي للدخول</div>
+      <input type="text" class="login-input" id="loginCodeInput" placeholder="الكود الوظيفي" maxlength="10" autocomplete="off"
+        oninput="this.value=this.value.toUpperCase()" onkeydown="if(event.key==='Enter')doLogin()">
+      <div class="login-error" id="loginError"></div>
+      <button class="login-btn" onclick="doLogin()">دخول ✦</button>
+    </div>
+    <div id="managerPwStep" style="display:none;">
+      <div class="login-sub">🔒 دخول المدير — أدخل كلمة المرور</div>
+      <input type="password" class="login-input" id="managerPwInput" placeholder="كلمة المرور" autocomplete="current-password"
+        onkeydown="if(event.key==='Enter')managerPasswordLogin()">
+      <div class="login-error" id="managerPwError"></div>
+      <button class="login-btn" onclick="managerPasswordLogin()">دخول المدير ✦</button>
+      <div style="display:flex;justify-content:space-between;margin-top:14px;font-size:12px;">
+        <a href="#" onclick="backToCodeStep();return false;" style="color:var(--text-mid);">→ رجوع</a>
+        <a href="#" onclick="managerSetFirstPassword();return false;" style="color:var(--text-light);">تعيين كلمة المرور لأول مرة</a>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -1106,12 +1119,14 @@ let ordersCache = [];
 let ordersReady = false;
 let ordersListenerStarted = false;
 const authReady = new Promise((resolve)=>{
+  // Only fall back to an anonymous session when nobody is signed in, so a
+  // persisted manager (password) session survives a page reload
   fbAuth.onAuthStateChanged(user=>{
-    if(user) resolve(user);
-  });
-  fbAuth.signInAnonymously().catch(err=>{
-    console.error('Firebase auth error', err);
-    showToast('تعذّر الاتصال بالخادم، تحقق من الإنترنت','⚠️','toast-warning');
+    if(user){ resolve(user); return; }
+    fbAuth.signInAnonymously().catch(err=>{
+      console.error('Firebase auth error', err);
+      showToast('تعذّر الاتصال بالخادم، تحقق من الإنترنت','⚠️','toast-warning');
+    });
   });
 });
 function startOrdersListener(){
@@ -1170,7 +1185,7 @@ const categories = [
   { id:'daraj',       name:'درج',        icon:'📦', build: buildDaraj },
   { id:'shariha',     name:'شريحة',     icon:'🔲', build: buildShariha },
   { id:'topMatbakh',  name:'توب مطبخ',  icon:'🍽️', build: buildTopMatbakh },
-  { id:'louhTarhib',  name:'لوح ترحيب', icon:'🪧', build: buildLouhTarhib },
+  { id:'louhTarhib',  name:'لوحة وترجيت', icon:'🪧', build: buildLouhTarhib },
   { id:'mozayik',     name:'موزاييك',   icon:'🔷', build: buildMozayik },
   { id:'tahziz',      name:'تحزيز',     icon:'〰️', build: buildTahziz },
   { id:'taco',        name:'تاكو',      icon:'🔸', build: buildTaco },
@@ -2239,10 +2254,7 @@ function doLogin(){
   ['mainHeader'].forEach(id=>{ const el=document.getElementById(id); if(el) el.style.display=''; });
   document.querySelectorAll('.progress-bar-wrap, .app-layout, .fab').forEach(el=>{ el.style.display=''; });
   if(code === MANAGER_CODE){
-    // Manager login
-    sessionStorage.setItem('mkrm_user', JSON.stringify({code, role:'manager'}));
-    document.getElementById('loginPage').classList.add('hidden');
-    showManagerPage();
+    showManagerPwStep();
   } else if(code.length >= 3) {
     // Seller login - accept any code 3+ chars
     sessionStorage.setItem('mkrm_user', JSON.stringify({code, role:'seller'}));
@@ -2252,6 +2264,63 @@ function doLogin(){
     errEl.textContent='كود غير صالح، يجب أن يكون 3 أحرف على الأقل';
     document.getElementById('loginCodeInput').value='';
   }
+}
+
+// Manager password is checked by Firebase Authentication, never stored in this file
+const MANAGER_EMAIL = 'd1672@makarm-sales.app';
+function showManagerPwStep(){
+  document.getElementById('loginCodeStep').style.display='none';
+  document.getElementById('managerPwStep').style.display='';
+  document.getElementById('managerPwError').textContent='';
+  document.getElementById('managerPwInput').value='';
+  setTimeout(()=>document.getElementById('managerPwInput').focus(),50);
+}
+function backToCodeStep(){
+  document.getElementById('managerPwStep').style.display='none';
+  document.getElementById('loginCodeStep').style.display='';
+  document.getElementById('loginCodeInput').value='';
+  document.getElementById('loginError').textContent='';
+}
+function enterManagerPage(){
+  sessionStorage.setItem('mkrm_user', JSON.stringify({code:MANAGER_CODE, role:'manager'}));
+  document.getElementById('loginPage').classList.add('hidden');
+  backToCodeStep();
+  showManagerPage();
+}
+async function managerPasswordLogin(){
+  const pw = document.getElementById('managerPwInput').value;
+  const errEl = document.getElementById('managerPwError');
+  if(!pw){ errEl.textContent='الرجاء إدخال كلمة المرور'; return; }
+  try{
+    await fbAuth.signInWithEmailAndPassword(MANAGER_EMAIL, pw);
+    enterManagerPage();
+  }catch(err){
+    console.error('manager login error', err.code);
+    errEl.textContent = err.code==='auth/operation-not-allowed'
+      ? 'تسجيل الدخول بكلمة المرور غير مفعّل في Firebase بعد'
+      : err.code==='auth/too-many-requests' ? 'محاولات كثيرة، حاول لاحقًا'
+      : 'كلمة المرور غير صحيحة';
+  }
+}
+async function managerSetFirstPassword(){
+  const pw = document.getElementById('managerPwInput').value;
+  const errEl = document.getElementById('managerPwError');
+  if(pw.length < 6){ errEl.textContent='اكتب كلمة مرور جديدة (6 أحرف على الأقل) ثم اضغط تعيين'; return; }
+  try{
+    await fbAuth.createUserWithEmailAndPassword(MANAGER_EMAIL, pw);
+    showToast('تم تعيين كلمة مرور المدير ✓','✓','toast-success');
+    enterManagerPage();
+  }catch(err){
+    console.error('manager set password error', err.code);
+    errEl.textContent = err.code==='auth/email-already-in-use'
+      ? 'كلمة المرور معيّنة مسبقًا، استخدم زر الدخول'
+      : err.code==='auth/operation-not-allowed'
+      ? 'تسجيل الدخول بكلمة المرور غير مفعّل في Firebase بعد'
+      : 'تعذّر التعيين، حاول مجددًا';
+  }
+}
+function isManagerAuthed(){
+  return fbAuth.currentUser && fbAuth.currentUser.email === MANAGER_EMAIL;
 }
 
 function startApp(sellerCode){
@@ -2686,6 +2755,10 @@ async function exportManagerPDF(){
 // ══════════════════════════════════════════════════════
 function globalLogout() {
   sessionStorage.removeItem('mkrm_user');
+  // Drop the manager's password session and go back to an anonymous one
+  if(isManagerAuthed()){
+    fbAuth.signOut().then(()=>fbAuth.signInAnonymously()).catch(err=>console.error('signout error', err));
+  }
   // hide everything, show login
   document.getElementById('mainHeader').style.display = 'none';
   document.querySelector('.progress-bar-wrap').style.display = 'none';
@@ -2781,7 +2854,11 @@ window.addEventListener('DOMContentLoaded',()=>{
       const user = JSON.parse(session);
       document.getElementById('loginPage').classList.add('hidden');
       if(user.role==='manager'){
-        showManagerPage();
+        // A stored "manager" flag alone isn't enough: require the password session
+        authReady.then(()=>{
+          if(isManagerAuthed()) showManagerPage();
+          else { sessionStorage.removeItem('mkrm_user'); document.getElementById('loginPage').classList.remove('hidden'); }
+        });
         return;
       } else {
         // seller - load app + show their orders tab
