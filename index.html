@@ -1175,6 +1175,7 @@ const categories = [
   { id:'tahziz',      name:'تحزيز',     icon:'〰️', build: buildTahziz },
   { id:'taco',        name:'تاكو',      icon:'🔸', build: buildTaco },
   { id:'topTawla',    name:'توب طاولة', icon:'🪵', build: buildTopTawla },
+  { id:'glassMirror', name:'الزجاج والمرايا', icon:'🪞', build: buildGlassMirror },
 ];
 
 // ══════════════════════════════════════════════════════
@@ -1343,6 +1344,39 @@ function buildMagasil(el){
   // Qty
   el.appendChild(makeImageUploadSection('magasil'));
   el.appendChild(makeQtySection('magasil'));
+}
+
+function buildGlassMirror(el){
+  const SHOWER_KEYS = ['showerType','accessoryColor','glassColor'];
+  const MIRROR_KEYS = ['mirrorShape','lighting','edges'];
+  const renderSub = (val)=>{
+    el.querySelector('#glass-sub')?.remove();
+    const sub = document.createElement('div');
+    sub.id='glass-sub'; sub.className='sub-options';
+    if(val==='شاور'){
+      sub.appendChild(makeChipsSection('نوع الشاور',['ثابت','مفصلي','سحاب'],'glassMirror','showerType',null,false,true));
+      sub.appendChild(makeChipsSection('لون الأكسسوارات',['فضي','أسود','ذهبي'],'glassMirror','accessoryColor',null,false,true));
+      sub.appendChild(makeInlineSection('لون الزجاج','glassMirror','glassColor','أدخل لون الزجاج...'));
+    } else {
+      sub.appendChild(makeChipsSection('نوع المرايا',['مستطيل','دائري'],'glassMirror','mirrorShape',null,false,true));
+      sub.appendChild(makeChipsSection('الإضاءة',['بدون ليد','مع ليد'],'glassMirror','lighting',null,false,true));
+      sub.appendChild(makeChipsSection('الحواف',['مصقولة','مشطوفة'],'glassMirror','edges',null,false,true));
+    }
+    sub.appendChild(makeInlineSection('العرض (MM)','glassMirror','widthMm','أدخل العرض بالمليمتر...'));
+    sub.appendChild(makeInlineSection('الارتفاع (MM)','glassMirror','heightMm','أدخل الارتفاع بالمليمتر...'));
+    step1.after(sub);
+  };
+  const step1 = makeChipsSection('النوع',['شاور','مرايا'],'glassMirror','glassType',(val,st)=>{
+    (val==='شاور' ? MIRROR_KEYS : SHOWER_KEYS).forEach(k=>delete st[k]);
+    renderSub(val);
+    updateSummary(); updateCategoryBadge('glassMirror');
+  }, false, true);
+  el.appendChild(step1);
+  const cur = getState('glassMirror').glassType;
+  if(cur) renderSub(cur);
+  el.appendChild(makeInlineSection('رقم المادة','glassMirror','materialNum','أدخل رقم المادة...'));
+  el.appendChild(makeImageUploadSection('glassMirror'));
+  el.appendChild(makeQtySection('glassMirror'));
 }
 
 function buildCyclo(el){
@@ -2140,6 +2174,8 @@ function formatKey(k){
     pattern:'النمط',patternCustom:'نمط مخصص',pieceSize:'حجم الحبة',tileSize:'حجم القطعة',
     extras:'مميزات إضافية',legType:'نوع الأرجل',legTypeCustom:'أرجل مخصصة',
     text:'النص',carving:'الحفر',
+    glassType:'النوع',showerType:'نوع الشاور',accessoryColor:'لون الأكسسوارات',glassColor:'لون الزجاج',
+    mirrorShape:'نوع المرايا',lighting:'الإضاءة',edges:'الحواف',widthMm:'العرض (MM)',heightMm:'الارتفاع (MM)',
   };
   return map[k]||k;
 }
