@@ -769,16 +769,60 @@
   .decorative-line-bar{flex:1;height:1px;background:linear-gradient(90deg,var(--gold-light),transparent);}
   .decorative-line-diamond{width:7px;height:7px;background:var(--secondary);transform:rotate(45deg);}
 
+  .field-input, .search-input, .custom-input, .inline-input, .login-card { box-sizing:border-box; }
+  .summary-toggle { display:none; }
   @media(max-width:1024px){
     .app-layout{grid-template-columns:1fr;}
-    .summary-panel{position:fixed;bottom:0;right:0;left:0;height:auto;max-height:38vh;top:auto;}
+    .summary-panel{position:fixed;bottom:0;right:0;left:0;height:auto;max-height:38vh;top:auto;z-index:50;}
     .main-panel{padding-bottom:calc(38vh + 20px);}
     .seller-card{grid-template-columns:1fr 1fr;}
     .request-grid{grid-template-columns:1fr 1fr;}
+    /* Compact bottom bar: summary details collapse behind a toggle */
+    .summary-header{display:flex;align-items:center;gap:10px;padding:10px 16px;flex-wrap:wrap;}
+    .summary-logo,.summary-subtitle{display:none;}
+    .summary-title{font-size:15px;margin:0;}
+    .req-num-badge{margin-top:0;}
+    .summary-toggle{display:inline-block;margin-inline-start:auto;background:rgba(207,146,94,0.15);border:1px solid rgba(207,146,94,0.3);color:var(--secondary-light);border-radius:50px;padding:5px 12px;font-family:'Tajawal',sans-serif;font-size:12px;font-weight:700;cursor:pointer;}
+    .summary-panel:not(.expanded) .summary-body{display:none;}
+    .summary-panel.expanded{max-height:70vh;}
+    .summary-footer{padding:10px 16px;}
+    /* Order summary only matters on the new-order tab */
+    body:not([data-tab="new"]) .summary-panel{display:none;}
+    body[data-tab="new"] .fab{bottom:140px;}
+    .fab{width:46px;height:46px;font-size:18px;right:16px;}
+    .manager-table-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch;}
+    .req-table{min-width:760px;}
+    .manager-table-header{flex-wrap:wrap;gap:10px;}
+  }
+  @media(max-width:600px){
+    .login-card{padding:32px 20px;width:calc(100% - 32px);}
+    #mainHeader{padding:0 12px;gap:8px;}
+    .header-logo-img-wrap img{height:38px;}
+    .header-center{flex:1;min-width:0;}
+    .search-wrap{width:100%;}
+    .search-input,.search-input:focus{width:100%;padding:9px 14px 9px 38px;font-size:13px;}
+    .app-tab{font-size:13px;padding:12px 4px;white-space:nowrap;}
+    .main-panel{padding-left:14px;padding-right:14px;}
+    .seller-card{grid-template-columns:1fr;padding:18px;}
+    .field-input{width:100%;min-width:0;}
+    .manager-header{padding:16px;}
+    .manager-title{font-size:17px;}
+    .manager-stats{gap:10px;}
+    .stat-card{padding:16px 10px;}
+    .stat-num{font-size:28px;}
+    .manager-tab{padding:10px 18px;font-size:13px;}
+    .manager-table-header{padding:14px;}
+    .manager-table-header .search-wrap{order:3;flex-basis:100%;}
+    .manager-table-header > div:last-child{flex-wrap:wrap;width:100%;gap:8px;}
+    .manager-table-header select{flex:1 1 100%;}
+    .clear-btn,.manager-export-btn{white-space:nowrap;flex:1;}
+    .manager-table-header > select{flex:1 1 100%;order:4;}
+    .seller-order-head{flex-wrap:wrap;gap:10px;}
+    .section-header[style*="justify-content:space-between"] .search-wrap{flex-basis:100%;}
   }
 </style>
 </head>
-<body>
+<body data-tab="new">
 
 <!-- GLOBAL TOP BAR: logout + refresh, reserved strip above every page header -->
 <div class="global-topbar">
@@ -1068,6 +1112,7 @@
       <div class="summary-title">تفاصيل الطلب</div>
       <div class="summary-subtitle">ORDER SUMMARY</div>
       <div class="req-num-badge"><span>🔢</span><span id="reqNum">—</span></div>
+      <button class="summary-toggle" onclick="toggleMobileSummary()">عرض التفاصيل ▴</button>
     </div>
     <div class="summary-body" id="summaryBody">
       <div class="summary-empty" id="summaryEmpty">
@@ -1845,6 +1890,14 @@ function switchTab(tab){
   if(tab==='invoices'){
     renderMyInvoices();
   }
+  document.body.dataset.tab = tab;
+  syncMobileSummaryPadding();
+}
+function toggleMobileSummary(){
+  const p = document.getElementById('summaryPanel');
+  const open = p.classList.toggle('expanded');
+  p.querySelector('.summary-toggle').textContent = open ? 'إخفاء التفاصيل ▾' : 'عرض التفاصيل ▴';
+  syncMobileSummaryPadding();
 }
 
 function getSellerCode(){
