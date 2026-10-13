@@ -1465,7 +1465,7 @@ function buildDaraj(el){
 }
 
 function buildShariha(el){
-  el.appendChild(makeChipsSection('المقاس (سم)',['5','8','10','12','15','20'],'shariha','width',null,false,true));
+  el.appendChild(makeInlineSection('المقاس (سم)','shariha','width','أدخل المقاس بالسنتيمتر...',true));
   el.appendChild(makeInlineSection('رقم المادة','shariha','materialNum','أدخل رقم المادة...'));
   el.appendChild(makeImageUploadSection('shariha'));
   el.appendChild(makeQtySection('shariha'));
