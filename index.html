@@ -1162,22 +1162,31 @@ const fbAuth = firebase.auth();
 const db = firebase.firestore();
 let ordersCache = [];
 let ordersReady = false;
-let ordersListenerStarted = false;
+let ordersUnsub = null;
+let ordersWanted = false;
 const authReady = new Promise((resolve)=>{
   // Only fall back to an anonymous session when nobody is signed in, so a
   // persisted manager (password) session survives a page reload
   fbAuth.onAuthStateChanged(user=>{
-    if(user){ resolve(user); return; }
+    if(user){
+      resolve(user);
+      // The listener dies if auth briefly drops (e.g. manager logout); bring it back
+      if(ordersWanted && !ordersUnsub) startOrdersListener();
+      return;
+    }
     fbAuth.signInAnonymously().catch(err=>{
       console.error('Firebase auth error', err);
       showToast('تعذّر الاتصال بالخادم، تحقق من الإنترنت','⚠️','toast-warning');
     });
   });
 });
+function stopOrdersListener(){
+  if(ordersUnsub){ ordersUnsub(); ordersUnsub = null; }
+}
 function startOrdersListener(){
-  if(ordersListenerStarted) return;
-  ordersListenerStarted = true;
-  db.collection('orders').onSnapshot(snap=>{
+  ordersWanted = true;
+  if(ordersUnsub) return;
+  ordersUnsub = db.collection('orders').onSnapshot(snap=>{
     // Sort client-side (not via .orderBy) so any legacy document without
     // a createdAt field still shows up instead of being silently excluded.
     ordersCache = snap.docs.map(d=>({ id:d.id, ...d.data() })).sort((a,b)=>(a.createdAt||0)-(b.createdAt||0));
@@ -1185,8 +1194,36 @@ function startOrdersListener(){
     document.dispatchEvent(new CustomEvent('orders-updated'));
   }, err=>{
     console.error('Firestore listen error', err);
-    showToast('تعذّر تحميل الطلبات من الخادم','⚠️','toast-warning');
+    ordersUnsub = null;
+    // Retry; onAuthStateChanged also restarts it once a user is signed in again
+    setTimeout(()=>{ if(ordersWanted && !ordersUnsub && fbAuth.currentUser) startOrdersListener(); }, 2000);
   });
+}
+
+// Firestore queues writes while offline and only resolves once the server
+// confirms, so tell the user instead of looking frozen
+async function withSlowNotice(promise, label){
+  const t = setTimeout(()=>showToast(`${label}: الاتصال بطيء، انتظر قليلًا...`,'⏳','toast-info'), 8000);
+  try{ return await promise; } finally{ clearTimeout(t); }
+}
+function setBusy(btn, busy, busyText){
+  if(!btn) return;
+  if(busy){ btn.dataset.label = btn.innerHTML; btn.disabled = true; btn.style.opacity='0.6'; if(busyText) btn.innerHTML = busyText; }
+  else { btn.disabled = false; btn.style.opacity=''; if(btn.dataset.label){ btn.innerHTML = btn.dataset.label; delete btn.dataset.label; } }
+}
+function newMsgId(){ return Date.now().toString(36)+Math.random().toString(36).slice(2,8); }
+
+// Re-render without losing what the user is typing (or their cursor)
+function preserveTyping(container, render){
+  if(!container){ render(); return; }
+  const saved = {};
+  container.querySelectorAll('textarea[id], input[id]').forEach(el=>{ if(el.value) saved[el.id]=el.value; });
+  const active = document.activeElement;
+  const focusId = active && container.contains(active) && active.id ? active.id : null;
+  const sel = focusId && 'selectionStart' in active ? [active.selectionStart, active.selectionEnd] : null;
+  render();
+  Object.entries(saved).forEach(([id,v])=>{ const el=document.getElementById(id); if(el && !el.value) el.value=v; });
+  if(focusId){ const el=document.getElementById(focusId); if(el){ el.focus(); if(sel){ try{ el.setSelectionRange(sel[0], sel[1]); }catch(e){} } } }
 }
 
 // Escape free-text user input before it is inserted as innerHTML
@@ -1954,8 +1991,8 @@ function renderSellerOrders(){
         <div class="thread-title">المحادثة</div>
         ${thread}
         <div class="thread-reply-row">
-          <textarea class="thread-reply-input" id="seller-reply-${i}" placeholder="ردّ على المدير..."></textarea>
-          <button class="thread-reply-btn" onclick="sellerSendReply(${i})">إرسال</button>
+          <textarea class="thread-reply-input" id="seller-reply-${o.id}" placeholder="ردّ على المدير..."></textarea>
+          <button class="thread-reply-btn" onclick="sellerSendReply('${o.id}', this)">إرسال</button>
         </div>
       </div>
     </div>`;
@@ -1978,26 +2015,26 @@ function renderThreadBubbles(thread, viewer, orderIdx){
   }).join('');
 }
 
-async function sellerSendReply(orderIdx){
-  const input = document.getElementById(`seller-reply-${orderIdx}`);
+async function sellerSendReply(orderId, btn){
+  const input = document.getElementById(`seller-reply-${orderId}`);
   const text = input ? input.value.trim() : '';
   if(!text) return;
-  const orders = getOrders();
-  const order = orders[orderIdx];
-  if(!order) return;
-  const thread = [...(order.thread||[]), {
-    from:'seller',
-    text,
-    time: nowStamp()
-  }];
+  if(btn && btn.disabled) return;
+  const msg = { id:newMsgId(), from:'seller', text, time: nowStamp() };
+  setBusy(btn, true, '...');
   try{
     await authReady;
-    await db.collection('orders').doc(order.id).update({ thread });
-    input.value = '';
+    // arrayUnion appends server-side, so a simultaneous reply from the
+    // other side can't overwrite this one
+    await withSlowNotice(db.collection('orders').doc(orderId).update({ thread: firebase.firestore.FieldValue.arrayUnion(msg) }), 'إرسال الرد');
+    const cur = document.getElementById(`seller-reply-${orderId}`);
+    if(cur) cur.value = '';
     showToast('تم إرسال ردك','✓','toast-success');
   }catch(err){
     console.error('sellerSendReply error', err);
     showToast('تعذّر إرسال الرد، تحقق من الإنترنت','⚠️','toast-warning');
+  }finally{
+    setBusy(btn, false);
   }
 }
 function nowStamp(){
@@ -2005,22 +2042,27 @@ function nowStamp(){
   return `${now.getDate()}/${now.getMonth()+1}/${now.getFullYear()} ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
 }
 
+const seenInFlight = new Set();
 async function markManagerMsgSeen(sellerCode){
-  const orders = getOrders();
-  const toUpdate = [];
-  orders.forEach(o=>{
-    if(o.sellerCode!==sellerCode) return;
-    const thread = o.thread||[];
-    if(!thread.some(m=>m.from==='manager'&&!m.seenBySeller)) return;
-    toUpdate.push({ id:o.id, thread: thread.map(m=>m.from==='manager'?{...m,seenBySeller:true}:m) });
-  });
-  if(toUpdate.length===0) return;
-  try{
-    await authReady;
-    const batch = db.batch();
-    toUpdate.forEach(u=>batch.update(db.collection('orders').doc(u.id), { thread:u.thread }));
-    await batch.commit();
-  }catch(err){ console.error('markManagerMsgSeen error', err); }
+  const ids = getOrders()
+    .filter(o=>o.sellerCode===sellerCode && (o.thread||[]).some(m=>m.from==='manager'&&!m.seenBySeller))
+    .map(o=>o.id).filter(id=>!seenInFlight.has(id));
+  if(ids.length===0) return;
+  await authReady;
+  await Promise.all(ids.map(async id=>{
+    seenInFlight.add(id);
+    try{
+      // Re-read inside a transaction so a message that just arrived isn't wiped
+      await db.runTransaction(async t=>{
+        const ref = db.collection('orders').doc(id);
+        const snap = await t.get(ref);
+        if(!snap.exists) return;
+        const thread = (snap.data().thread||[]).map(m=>m.from==='manager'&&!m.seenBySeller?{...m,seenBySeller:true}:m);
+        t.update(ref, { thread });
+      });
+    }catch(err){ console.error('markManagerMsgSeen error', err); }
+    finally{ seenInFlight.delete(id); }
+  }));
 }
 
 function updateOrdersBadge(){
@@ -2037,37 +2079,39 @@ function updateOrdersBadge(){
 // ══════════════════════════════════════════════════════
 let managerAttachedPDF = null; // { name, dataUrl }
 
-async function managerReply(orderIdx){
-  const input = document.getElementById(`mgr-reply-${orderIdx}`);
+async function managerReply(orderId, btn){
+  const input = document.getElementById(`mgr-reply-${orderId}`);
   const text = input ? input.value.trim() : '';
-  if(!text && !managerAttachedPDF) { showToast('اكتب رداً أو أرفق ملفاً','⚠️','toast-warning'); return; }
-  const orders = getOrders();
-  const order = orders[orderIdx];
-  if(!order) return;
-  const msg = {
-    from:'manager',
-    text: text||'',
-    time: nowStamp(),
-    seenBySeller: false
-  };
-  if(managerAttachedPDF){ msg.pdfData = managerAttachedPDF.dataUrl; }
-  const thread = [...(order.thread||[]), msg];
+  const pdf = managerAttachedPDF && managerAttachedPDF.orderId===orderId ? managerAttachedPDF : null;
+  if(!text && !pdf) { showToast('اكتب رداً أو أرفق ملفاً','⚠️','toast-warning'); return; }
+  if(btn && btn.disabled) return;
+  const msg = { id:newMsgId(), from:'manager', text: text||'', time: nowStamp(), seenBySeller: false };
+  if(pdf){ msg.pdfData = pdf.dataUrl; }
+  setBusy(btn, true, '...');
   try{
     await authReady;
-    await db.collection('orders').doc(order.id).update({ thread });
-    if(input) input.value='';
-    managerAttachedPDF = null;
-    const prevEl = document.getElementById(`attach-preview-${orderIdx}`);
+    await withSlowNotice(db.collection('orders').doc(orderId).update({ thread: firebase.firestore.FieldValue.arrayUnion(msg) }), 'إرسال الرد');
+    const cur = document.getElementById(`mgr-reply-${orderId}`);
+    if(cur) cur.value='';
+    if(pdf) managerAttachedPDF = null;
+    const prevEl = document.getElementById(`attach-preview-${orderId}`);
     if(prevEl) prevEl.innerHTML='';
     showToast('تم إرسال الرد للبائع ✓','✓','toast-success');
   }catch(err){
     console.error('managerReply error', err);
     showToast('تعذّر إرسال الرد، تحقق من الإنترنت','⚠️','toast-warning');
+  }finally{
+    setBusy(btn, false);
   }
 }
 
 const MAX_PDF_BYTES = 700*1024;
-function managerAttachPDF(orderIdx){
+function attachChipHtml(orderId){
+  const p = managerAttachedPDF;
+  return p && p.orderId===orderId
+    ? `<div class="pdf-attach-chip">📄 ${esc(p.name)} <span class="pdf-attach-remove" onclick="clearAttach('${orderId}')">✕</span></div>` : '';
+}
+function managerAttachPDF(orderId){
   const fileInput = document.createElement('input');
   fileInput.type = 'file';
   fileInput.accept = 'application/pdf';
@@ -2080,18 +2124,18 @@ function managerAttachPDF(orderIdx){
     }
     const reader = new FileReader();
     reader.onload = (ev)=>{
-      managerAttachedPDF = { name: file.name, dataUrl: ev.target.result };
-      const prevEl = document.getElementById(`attach-preview-${orderIdx}`);
-      if(prevEl) prevEl.innerHTML = `<div class="pdf-attach-chip">📄 ${esc(file.name)} <span class="pdf-attach-remove" onclick="clearAttach(${orderIdx})">✕</span></div>`;
+      managerAttachedPDF = { orderId, name: file.name, dataUrl: ev.target.result };
+      const prevEl = document.getElementById(`attach-preview-${orderId}`);
+      if(prevEl) prevEl.innerHTML = attachChipHtml(orderId);
     };
     reader.readAsDataURL(file);
   };
   fileInput.click();
 }
 
-function clearAttach(orderIdx){
+function clearAttach(orderId){
   managerAttachedPDF = null;
-  const prevEl = document.getElementById(`attach-preview-${orderIdx}`);
+  const prevEl = document.getElementById(`attach-preview-${orderId}`);
   if(prevEl) prevEl.innerHTML='';
 }
 
@@ -2146,10 +2190,13 @@ async function submitOrder(){
     notes
   };
 
-  const submitBtn = document.querySelector('#panel-new .btn-primary');
-  if(submitBtn) submitBtn.disabled = true;
+  // Both send buttons (form + summary bar) share this guard against double-sending
+  if(submitOrder.busy) return;
+  submitOrder.busy = true;
+  const btns = [document.querySelector('#panel-new .btn-primary'), document.querySelector('.summary-footer .export-btn')];
+  btns.forEach(b=>setBusy(b, true, '<span>⏳</span><span>جارٍ الإرسال...</span>'));
   try{
-    await saveOrder(orderData);
+    await withSlowNotice(saveOrder(orderData), 'إرسال الطلب');
     document.getElementById('successReqNum').textContent = `رقم الطلب: ${appState.reqNumber}`;
     document.getElementById('successOverlay').classList.add('show');
     showToast('تم إرسال الطلب بنجاح ✓','✓','toast-success');
@@ -2157,7 +2204,8 @@ async function submitOrder(){
     console.error('submitOrder error', err);
     showToast('تعذّر إرسال الطلب، تحقق من الإنترنت وحاول مجددًا','⚠️','toast-warning');
   }finally{
-    if(submitBtn) submitBtn.disabled = false;
+    btns.forEach(b=>setBusy(b, false));
+    submitOrder.busy = false;
   }
 }
 
@@ -2185,9 +2233,10 @@ async function submitInvoice(){
     invoiceNumber, invoiceDate: dateStr
   };
   const btn = document.querySelector('#panel-invoices .btn-primary');
-  if(btn) btn.disabled = true;
+  if(btn && btn.disabled) return;
+  setBusy(btn, true, '<span>⏳</span><span>جارٍ الإرسال...</span>');
   try{
-    await saveOrder(orderData);
+    await withSlowNotice(saveOrder(orderData), 'إرسال الفاتورة');
     showToast('تم إرسال الفاتورة بنجاح ✓','✓','toast-success');
     document.getElementById('invInvoiceNumber').value='';
     document.querySelectorAll('#panel-invoices .field-input.error').forEach(el=>el.classList.remove('error'));
@@ -2195,7 +2244,7 @@ async function submitInvoice(){
     console.error('submitInvoice error', err);
     showToast('تعذّر إرسال الفاتورة، تحقق من الإنترنت','⚠️','toast-warning');
   }finally{
-    if(btn) btn.disabled = false;
+    setBusy(btn, false);
   }
 }
 
@@ -2596,7 +2645,7 @@ function showOrderDetail(idx){
   const orders = getOrders();
   const o = orders[idx];
   if(!o) return;
-  window.__openOrderDetailIdx = idx;
+  window.__openOrderDetailId = o.id;
   document.getElementById('detailReqNum').textContent = o.reqNumber||'—';
   const invoicePart = o.invoiceNumber ? ` • فاتورة ${o.invoiceNumber}` : '';
   document.getElementById('detailMeta').textContent = `${o.sellerCode||''} • فرع ${o.branchCode||''}${invoicePart} • ${o.date||''} ${o.time?'- '+o.time:''}`;
@@ -2639,21 +2688,25 @@ function showOrderDetail(idx){
   // Conversation thread
   html += `<div class="order-detail-section">
     <div class="order-detail-label">المحادثة مع البائع</div>
-    <div id="detail-thread-${idx}">${renderManagerThread(o.thread||[])}</div>
+    <div id="detail-thread-${o.id}">${renderManagerThread(o.thread||[])}</div>
   </div>`;
 
   document.getElementById('orderDetailBody').innerHTML = html || '<div style="text-align:center;padding:30px;color:var(--text-light);">لا توجد تفاصيل</div>';
 
-  // Build reply footer
+  // Reply footer: only rebuilt when switching orders, so live updates to the
+  // same order never wipe what the manager is typing or the attached PDF
   const foot = document.getElementById('orderDetailFoot');
-  foot.innerHTML = `
-    <div id="attach-preview-${idx}" class="manager-pdf-attach-preview"></div>
-    <div class="manager-reply-wrap">
-      <button class="manager-attach-btn" onclick="managerAttachPDF(${idx})">📎 ملف PDF</button>
-      <textarea class="manager-reply-input" id="mgr-reply-${idx}" placeholder="اكتب ردك على البائع..." rows="1"></textarea>
-      <button class="manager-send-btn" onclick="managerReply(${idx})">إرسال</button>
-    </div>
-  `;
+  if(foot.dataset.orderId !== o.id){
+    foot.dataset.orderId = o.id;
+    foot.innerHTML = `
+      <div id="attach-preview-${o.id}" class="manager-pdf-attach-preview">${attachChipHtml(o.id)}</div>
+      <div class="manager-reply-wrap">
+        <button class="manager-attach-btn" onclick="managerAttachPDF('${o.id}')">📎 ملف PDF</button>
+        <textarea class="manager-reply-input" id="mgr-reply-${o.id}" placeholder="اكتب ردك على البائع..." rows="1"></textarea>
+        <button class="manager-send-btn" onclick="managerReply('${o.id}', this)">إرسال</button>
+      </div>
+    `;
+  }
 
   document.getElementById('orderDetailOverlay').classList.add('show');
 }
@@ -2674,7 +2727,7 @@ function renderManagerThread(thread){
 
 function closeOrderDetail(){
   document.getElementById('orderDetailOverlay').classList.remove('show');
-  window.__openOrderDetailIdx = null;
+  window.__openOrderDetailId = null;
 }
 
 function exportOrderPDF(o){
@@ -2810,7 +2863,10 @@ function globalLogout() {
   sessionStorage.removeItem('mkrm_user');
   // Drop the manager's password session and go back to an anonymous one
   if(isManagerAuthed()){
-    fbAuth.signOut().then(()=>fbAuth.signInAnonymously()).catch(err=>console.error('signout error', err));
+    // Detach first so the brief signed-out moment doesn't error the listener;
+    // onAuthStateChanged re-attaches it once the anonymous session is back
+    stopOrdersListener();
+    fbAuth.signOut().catch(err=>console.error('signout error', err));
   }
   // hide everything, show login
   document.getElementById('mainHeader').style.display = 'none';
@@ -2930,12 +2986,13 @@ document.addEventListener('orders-updated', ()=>{
       renderManagerInvoicesTable();
     }
     if(document.getElementById('orderDetailOverlay')?.classList.contains('show')){
-      const openIdx = window.__openOrderDetailIdx;
-      if(openIdx!=null) showOrderDetail(openIdx);
+      // Follow the open order by id, not list position, so it can't jump to another order
+      const idx = getOrders().findIndex(o=>o.id===window.__openOrderDetailId);
+      if(idx>=0) showOrderDetail(idx); else closeOrderDetail();
     }
   }
   if(document.getElementById('panel-myorders')?.classList.contains('show')){
-    renderSellerOrders();
+    preserveTyping(document.getElementById('sellerOrdersWrap'), renderSellerOrders);
   }
   if(document.getElementById('panel-invoices')?.classList.contains('show')){
     renderMyInvoices();
