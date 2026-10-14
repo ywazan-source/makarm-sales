@@ -656,6 +656,13 @@
     cursor:pointer; transition:var(--transition);
   }
   .manager-tab.active { background:var(--primary); border-color:var(--primary); color:white; }
+  .confirm-overlay { position:fixed;inset:0;z-index:20000;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;padding:16px; }
+  .confirm-card { background:white;border-radius:18px;padding:24px 22px 18px;width:100%;max-width:360px;box-shadow:0 20px 60px rgba(0,0,0,0.3);text-align:center;font-family:'Tajawal',sans-serif; }
+  .confirm-msg { font-size:15px;font-weight:700;color:var(--text-dark);line-height:1.7;margin-bottom:18px; }
+  .confirm-actions { display:flex;gap:10px; }
+  .confirm-actions button { flex:1;padding:11px;border-radius:50px;font-family:'Tajawal',sans-serif;font-size:14px;font-weight:700;cursor:pointer; }
+  .confirm-cancel { background:white;border:1.5px solid rgba(201,169,110,0.4);color:var(--text-mid); }
+  .confirm-ok { background:#e53e3e;border:none;color:white; }
   .credit-footer { text-align:center; font-size:11px; color:var(--text-light); opacity:0.75; padding:22px 0 8px; }
   .manager-tab-panel { display:none; }
   .manager-tab-panel.show { display:block; }
@@ -1865,8 +1872,8 @@ function syncMobileSummaryPadding(){
 // ══════════════════════════════════════════════════════
 // RESET
 // ══════════════════════════════════════════════════════
-function resetForm(){
-  if(!confirm('هل أنت متأكد من إعادة تعيين جميع الاختيارات؟')) return;
+async function resetForm(){
+  if(!await askConfirm('هل أنت متأكد من إعادة تعيين جميع الاختيارات؟', 'إعادة تعيين')) return;
   appState.selections={}; appState.requestTypes=[]; appState.reqNumber=generateReqNum();
   ['sellerCode','branchCode','globalNotes'].forEach(id=>{ const el=document.getElementById(id); if(el) el.value=''; });
   document.querySelectorAll('.category-item').forEach(item=>{
@@ -2448,34 +2455,63 @@ function getOrders(){
 }
 // "Deleting" never removes the Firestore document — it only hides it from
 // the side that deleted it, so the other side's copy is never affected.
+// In-page confirmation. The browser's confirm() is silently suppressed in
+// some cases (Chrome's "prevent additional dialogs", in-app browsers like
+// WhatsApp), returning false instantly so delete buttons did nothing.
+function askConfirm(message, okText='حذف'){
+  return new Promise(resolve=>{
+    const ov = document.createElement('div');
+    ov.className = 'confirm-overlay';
+    ov.innerHTML = `<div class="confirm-card" role="dialog" aria-modal="true">
+      <div class="confirm-msg"></div>
+      <div class="confirm-actions">
+        <button type="button" class="confirm-cancel">إلغاء</button>
+        <button type="button" class="confirm-ok"></button>
+      </div></div>`;
+    ov.querySelector('.confirm-msg').textContent = message;
+    ov.querySelector('.confirm-ok').textContent = okText;
+    const done = v=>{ document.removeEventListener('keydown', onKey); ov.remove(); resolve(v); };
+    const onKey = e=>{ if(e.key==='Escape') done(false); };
+    ov.querySelector('.confirm-cancel').onclick = ()=>done(false);
+    ov.querySelector('.confirm-ok').onclick = ()=>done(true);
+    ov.onclick = e=>{ if(e.target===ov) done(false); };
+    document.addEventListener('keydown', onKey);
+    document.body.appendChild(ov);
+    ov.querySelector('.confirm-cancel').focus();
+  });
+}
+
 async function clearAllOrders(){
-  if(!confirm('هل أنت متأكد من مسح جميع الطلبات؟ (لن تتأثر نسخة البائعين)')) return;
+  if(!await askConfirm('هل أنت متأكد من مسح جميع الطلبات؟ (لن تتأثر نسخة البائعين)', 'مسح الكل')) return;
   try{
     await authReady;
     const batch = db.batch();
     ordersCache.filter(o=>!o.invoiceNumber && !o.hiddenForManager).forEach(o=>batch.update(db.collection('orders').doc(o.id), { hiddenForManager:true }));
     await batch.commit();
     renderManagerTable();
+    showToast('تم مسح الطلبات ✓','✓','toast-success');
   }catch(err){
     console.error('clearAllOrders error', err);
     showToast('تعذّر مسح الطلبات، حاول مجددًا','⚠️','toast-warning');
   }
 }
 async function hideOrderForManager(orderId){
-  if(!confirm('إخفاء هذا الطلب من عندك؟ (يبقى ظاهرًا عند البائع)')) return;
+  if(!await askConfirm('حذف هذا العنصر من عندك؟ (يبقى ظاهرًا عند البائع)')) return;
   try{
     await authReady;
     await db.collection('orders').doc(orderId).update({ hiddenForManager:true });
+    showToast('تم الحذف ✓','✓','toast-success');
   }catch(err){
     console.error('hideOrderForManager error', err);
     showToast('تعذّر الحذف، حاول مجددًا','⚠️','toast-warning');
   }
 }
 async function hideOrderForSeller(orderId){
-  if(!confirm('إخفاء هذا العنصر من عندك؟ (يبقى ظاهرًا عند المدير)')) return;
+  if(!await askConfirm('حذف هذا العنصر من عندك؟ (يبقى ظاهرًا عند المدير)')) return;
   try{
     await authReady;
     await db.collection('orders').doc(orderId).update({ hiddenForSeller:true });
+    showToast('تم الحذف ✓','✓','toast-success');
   }catch(err){
     console.error('hideOrderForSeller error', err);
     showToast('تعذّر الحذف، حاول مجددًا','⚠️','toast-warning');
