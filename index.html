@@ -1092,6 +1092,13 @@
         <input type="text" class="field-input" id="invInvoiceDate" readonly disabled style="opacity:0.7;cursor:not-allowed;">
       </div>
       <div class="field-group" style="grid-column:1/-1;">
+        <label class="field-label"><span class="req-star">*</span> الطلب المرتبط</label>
+        <select class="field-input" id="invLinkedOrder" onchange="renderLinkedOrderPreview()">
+          <option value="">اختر الطلب</option>
+        </select>
+        <div id="invLinkedPreview"></div>
+      </div>
+      <div class="field-group" style="grid-column:1/-1;">
         <label class="field-label">ملاحظات</label>
         <textarea class="field-input" id="invNotes" rows="3" placeholder="أي ملاحظات على الفاتورة..." style="resize:vertical;font-family:'Tajawal',sans-serif;"></textarea>
       </div>
@@ -1937,6 +1944,7 @@ function switchTab(tab){
   }
   if(tab==='invoices'){
     renderMyInvoices();
+    populateLinkedOrders();
   }
   document.body.dataset.tab = tab;
   syncMobileSummaryPadding();
@@ -2233,6 +2241,13 @@ async function submitInvoice(){
     ['invSellerCode','invBranchCode','invInvoiceNumber'].forEach(id=>{ const el=document.getElementById(id); if(!el.value.trim()) el.classList.add('error'); });
     return;
   }
+  const linkedSel = document.getElementById('invLinkedOrder');
+  const linked = getOrders().find(o=>o.id===linkedSel.value);
+  if(!linked){
+    showToast('يرجى اختيار الطلب المرتبط بالفاتورة','⚠️','toast-warning');
+    linkedSel.classList.add('error');
+    return;
+  }
   const now=new Date();
   const dateStr=`${now.getDate()}/${now.getMonth()+1}/${now.getFullYear()}`;
   const timeStr=`${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
@@ -2240,8 +2255,11 @@ async function submitInvoice(){
     reqNumber: generateReqNum(),
     sellerCode, branchCode,
     date: dateStr, time: timeStr,
-    categories: [], requestTypes: [], notes: document.getElementById('invNotes').value.trim(),
-    invoiceNumber, invoiceDate: dateStr
+    // Copy of the linked order's products (images left out to keep the doc small)
+    categories: (linked.categories||[]).map(({images, ...c})=>c),
+    requestTypes: linked.requestTypes||[], notes: document.getElementById('invNotes').value.trim(),
+    invoiceNumber, invoiceDate: dateStr,
+    linkedOrderId: linked.id, linkedReqNumber: linked.reqNumber||''
   };
   const btn = document.querySelector('#panel-invoices .btn-primary');
   if(btn && btn.disabled) return;
@@ -2251,6 +2269,8 @@ async function submitInvoice(){
     showToast('تم إرسال الفاتورة بنجاح ✓','✓','toast-success');
     document.getElementById('invInvoiceNumber').value='';
     document.getElementById('invNotes').value='';
+    linkedSel.value='';
+    renderLinkedOrderPreview();
     document.querySelectorAll('#panel-invoices .field-input.error').forEach(el=>el.classList.remove('error'));
   }catch(err){
     console.error('submitInvoice error', err);
@@ -2258,6 +2278,41 @@ async function submitInvoice(){
   }finally{
     setBusy(btn, false);
   }
+}
+
+function populateLinkedOrders(){
+  const sel = document.getElementById('invLinkedOrder');
+  if(!sel) return;
+  const code = getSellerCode();
+  const mine = code ? getOrders().filter(o=>o.sellerCode===code && !o.invoiceNumber && !o.hiddenForSeller).reverse() : [];
+  const current = sel.value;
+  const first = mine.length ? 'اختر الطلب' : 'لا توجد طلبات سابقة لهذا البائع';
+  sel.innerHTML = `<option value="">${first}</option>` + mine.map(o=>{
+    const prods = (o.categories||[]).map(c=>c.name).join('، ');
+    return `<option value="${esc(o.id)}">${esc(o.reqNumber||'—')} • ${esc(o.date||'')} • ${esc(prods||'بدون منتجات')}</option>`;
+  }).join('');
+  if(mine.some(o=>o.id===current)) sel.value = current;
+  renderLinkedOrderPreview();
+}
+
+function renderLinkedOrderPreview(){
+  const sel = document.getElementById('invLinkedOrder');
+  const box = document.getElementById('invLinkedPreview');
+  if(!sel || !box) return;
+  if(sel.value) sel.classList.remove('error');
+  const o = getOrders().find(x=>x.id===sel.value);
+  if(!o){ box.innerHTML=''; return; }
+  const cats = (o.categories||[]).map(cat=>{
+    const props = cat.details ? Object.entries(cat.details).map(([k,v])=>`<div class="order-detail-cat-prop"><span class="order-detail-cat-key">${esc(k)}:</span> <span class="order-detail-cat-val">${esc(v)}</span></div>`).join('') : '';
+    return `<div class="order-detail-cat"><div class="order-detail-cat-name">${esc(cat.name)} ×${esc(cat.qty||1)}</div>${props}</div>`;
+  }).join('');
+  const types = (o.requestTypes||[]).map(t=>`<span class="req-type-badge">${esc(t)}</span>`).join(' ');
+  box.innerHTML = `<div style="margin-top:10px;padding:12px;border:1px solid var(--glass-border);border-radius:12px;background:rgba(111,34,38,0.03);">
+    <div style="font-weight:700;margin-bottom:6px;">تفاصيل الطلب ${esc(o.reqNumber||'')} <span style="font-weight:400;color:var(--text-mid);font-size:12px;">${esc(o.date||'')}</span></div>
+    ${types?`<div style="margin-bottom:6px;">${types}</div>`:''}
+    ${cats||'<div style="color:var(--text-mid);font-size:13px;">لا توجد منتجات في هذا الطلب</div>'}
+    ${o.notes?`<div style="margin-top:6px;font-size:13px;color:var(--text-mid);white-space:pre-wrap;">ملاحظات: ${esc(o.notes)}</div>`:''}
+  </div>`;
 }
 
 function renderMyInvoices(){
@@ -2285,7 +2340,7 @@ function renderMyInvoices(){
       <div class="seller-order-head">
         <div>
           <div class="seller-order-num">🧾 ${esc(o.invoiceNumber)}</div>
-          <div class="seller-order-date">فرع ${esc(o.branchCode)||'—'} • ${esc(o.date)||'—'}${esc(timeStr)}</div>
+          <div class="seller-order-date">فرع ${esc(o.branchCode)||'—'} • ${esc(o.date)||'—'}${esc(timeStr)}${o.linkedReqNumber?` • الطلب ${esc(o.linkedReqNumber)}`:''}</div>
         </div>
         ${completionCol}
         <div class="seller-order-status">
@@ -2638,13 +2693,14 @@ function renderManagerInvoicesTable(){
       <td style="text-align:center"><input type="checkbox" style="width:18px;height:18px;cursor:pointer;" ${o.registered?'checked':''} onchange="setInvoiceRegistered('${o.id}', this.checked)" title="تم التسجيل"></td>
       <td><input type="date" class="field-input" style="padding:6px 10px;font-size:12px;" value="${esc(o.completionDate)||''}" onchange="setInvoiceCompletionDate('${o.id}', this.value)"></td>
       <td style="text-align:center"><input type="checkbox" style="width:18px;height:18px;cursor:pointer;" ${o.completed?'checked':''} onchange="setInvoiceCompleted('${o.id}', this.checked)" title="تمت من قبل المدير"></td>
+      <td class="req-detail-cell">${o.linkedReqNumber?`<span class="req-badge">${esc(o.linkedReqNumber)}</span><br>`:''}${(o.categories||[]).map(c=>`<span class="req-detail-chip">${esc(c.name)} ×${esc(c.qty||1)}</span>`).join('')||(o.linkedReqNumber?'':'—')}</td>
       <td style="max-width:180px;font-size:12px;color:var(--text-mid);white-space:pre-wrap;">${esc(o.notes)||'—'}</td>
       <td style="white-space:nowrap">${replyIndicator}<button onclick="showOrderDetail(${idx})" style="background:rgba(111,34,38,0.08);border:1px solid rgba(111,34,38,0.15);color:var(--primary);border-radius:8px;padding:5px 12px;font-family:Tajawal,sans-serif;font-size:12px;font-weight:600;cursor:pointer;">رد / تفاصيل</button> <button onclick="hideOrderForManager('${o.id}')" title="حذف من عندي" style="background:rgba(229,62,62,0.08);border:1px solid rgba(229,62,62,0.2);color:#e53e3e;border-radius:8px;padding:5px 10px;font-family:Tajawal,sans-serif;font-size:12px;font-weight:600;cursor:pointer;">🗑</button></td>
     </tr>`;
   }).join('');
   body.innerHTML=`<table class="req-table">
     <thead><tr>
-      <th>رقم الفاتورة</th><th>كود البائع</th><th>الفرع</th><th>التاريخ</th><th style="cursor:pointer;user-select:none;" onclick="toggleInvoiceRegisteredSort()" title="فرز">تم التسجيل${sortArrow}</th><th>تاريخ الانتهاء</th><th>تم الانتهاء</th><th>ملاحظات</th><th>رد</th>
+      <th>رقم الفاتورة</th><th>كود البائع</th><th>الفرع</th><th>التاريخ</th><th style="cursor:pointer;user-select:none;" onclick="toggleInvoiceRegisteredSort()" title="فرز">تم التسجيل${sortArrow}</th><th>تاريخ الانتهاء</th><th>تم الانتهاء</th><th>الطلب المرتبط</th><th>ملاحظات</th><th>رد</th>
     </tr></thead>
     <tbody>${rows}</tbody>
   </table>`;
@@ -2690,7 +2746,7 @@ function showOrderDetail(idx){
   if(!o) return;
   window.__openOrderDetailId = o.id;
   document.getElementById('detailReqNum').textContent = o.reqNumber||'—';
-  const invoicePart = o.invoiceNumber ? ` • فاتورة ${o.invoiceNumber}` : '';
+  const invoicePart = (o.invoiceNumber ? ` • فاتورة ${o.invoiceNumber}` : '') + (o.linkedReqNumber ? ` • الطلب المرتبط ${o.linkedReqNumber}` : '');
   document.getElementById('detailMeta').textContent = `${o.sellerCode||''} • فرع ${o.branchCode||''}${invoicePart} • ${o.date||''} ${o.time?'- '+o.time:''}`;
 
   let html = '';
@@ -3039,6 +3095,7 @@ document.addEventListener('orders-updated', ()=>{
   }
   if(document.getElementById('panel-invoices')?.classList.contains('show')){
     renderMyInvoices();
+    populateLinkedOrders();
   }
   updateOrdersBadge();
 });
