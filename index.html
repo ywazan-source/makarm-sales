@@ -534,18 +534,15 @@
   /* LOGIN PAGE */
   #loginPage {
     position:fixed; inset:0; z-index:10000;
-    background:linear-gradient(135deg,var(--primary-dark) 0%,var(--primary) 45%,var(--primary-light) 80%, #8b2b30 100%);
-    background-size:300% 300%;
-    animation:gradientShift 8s ease infinite;
+    background:var(--primary-dark) url('login-bg.webp') center/cover no-repeat;
     display:flex; align-items:center; justify-content:center; flex-direction:column;
     overflow:hidden;
   }
   #loginPage::before {
     content:''; position:absolute; inset:0;
-    background: radial-gradient(ellipse at 20% 50%, rgba(207,146,94,0.2) 0%, transparent 60%),
-                radial-gradient(ellipse at 80% 20%, rgba(201,169,110,0.15) 0%, transparent 50%),
-                radial-gradient(ellipse at 50% 80%, rgba(111,34,38,0.3) 0%, transparent 50%);
-    pointer-events:none; animation:orbDrift 12s ease-in-out infinite;
+    /* Soft dark veil so the card stands out over the photo */
+    background: linear-gradient(180deg, rgba(26,16,8,0.15) 0%, rgba(26,16,8,0.35) 100%);
+    pointer-events:none;
   }
   #loginPage.hidden { display:none; }
   .login-card {
