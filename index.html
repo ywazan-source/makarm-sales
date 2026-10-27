@@ -829,7 +829,8 @@
 body.viewer-mode .viewer-badge{display:inline-block;}
 body.viewer-mode #managerPage .clear-btn,
 body.viewer-mode #managerPage [onclick*="hideOrderForManager"],
-body.viewer-mode #orderDetailFoot{display:none !important;}
+body.viewer-mode #orderDetailFoot,
+body.viewer-mode #mtab-employees{display:none !important;}
 body.viewer-mode #managerInvoicesBody input{pointer-events:none;opacity:0.75;}
 /* Softer cards: one shared layered shadow, gentler borders, rounder corners */
 :root{
@@ -893,7 +894,20 @@ body.viewer-mode #managerInvoicesBody input{pointer-events:none;opacity:0.75;}
       <button class="login-btn" id="managerPwBtn" onclick="managerPasswordLogin()">دخول المدير ✦</button>
       <div style="display:flex;justify-content:space-between;margin-top:14px;font-size:12px;">
         <a href="#" onclick="backToCodeStep();return false;" style="color:var(--text-mid);">→ رجوع</a>
-        <a href="#" onclick="managerSetFirstPassword();return false;" style="color:var(--text-light);">تعيين كلمة المرور لأول مرة</a>
+        <a href="#" id="managerPwFirstLink" onclick="pwFirstTimeClick();return false;" style="color:var(--text-light);">تعيين كلمة المرور لأول مرة</a>
+      </div>
+    </div>
+    <div id="activationStep" style="display:none;">
+      <div class="login-sub" id="activationTitle">تفعيل الحساب لأول مرة</div>
+      <input type="text" class="login-input" id="actCodeInput" placeholder="رمز التفعيل (من المدير)" autocomplete="off" maxlength="12"
+        oninput="this.value=this.value.toUpperCase()" style="margin-bottom:10px;">
+      <input type="password" class="login-input" id="actPwInput" placeholder="كلمة مرور جديدة (6 أحرف أو أكثر)" autocomplete="new-password" style="margin-bottom:10px;">
+      <input type="password" class="login-input" id="actPw2Input" placeholder="تأكيد كلمة المرور" autocomplete="new-password"
+        onkeydown="if(event.key==='Enter')activateSellerAccount()">
+      <div class="login-error" id="activationError"></div>
+      <button class="login-btn" id="activationBtn" onclick="activateSellerAccount()">تفعيل ودخول ✦</button>
+      <div style="display:flex;justify-content:space-between;margin-top:14px;font-size:12px;">
+        <a href="#" onclick="backToCodeStep();return false;" style="color:var(--text-mid);">→ رجوع</a>
       </div>
     </div>
   </div>
@@ -913,6 +927,7 @@ body.viewer-mode #managerInvoicesBody input{pointer-events:none;opacity:0.75;}
     <div class="manager-tabs">
       <button class="manager-tab active" id="mtab-orders" onclick="switchManagerTab('orders')">📋 الطلبات</button>
       <button class="manager-tab" id="mtab-invoices" onclick="switchManagerTab('invoices')">🧾 الفواتير</button>
+      <button class="manager-tab" id="mtab-employees" onclick="switchManagerTab('employees')">👥 الموظفين</button>
     </div>
     <div class="manager-tab-panel show" id="mpanel-orders">
       <div class="manager-table-wrap">
@@ -949,6 +964,21 @@ body.viewer-mode #managerInvoicesBody input{pointer-events:none;opacity:0.75;}
         <div id="managerInvoicesBody"></div>
       </div>
       <div class="credit-footer">تم التصميم والإنشاء بواسطة يمان وزان<br>© 2026 جميع الحقوق محفوظة · All rights reserved</div>
+    </div>
+    <div class="manager-tab-panel" id="mpanel-employees">
+      <div class="manager-table-wrap">
+        <div class="manager-table-header">
+          <div class="manager-table-title">👥 الموظفين</div>
+          <button class="manager-export-btn" onclick="toggleAddEmployees()">➕ إضافة موظفين</button>
+        </div>
+        <div id="addEmployeesBox" style="display:none;padding:16px 24px;border-bottom:1px solid rgba(201,169,110,0.15);">
+          <div style="font-size:13px;color:var(--text-mid);margin-bottom:8px;">كل موظف في سطر: <b>الكود</b> ثم <b>الاسم</b>. مثال: <span dir="ltr">D5777 عبد العزيز</span></div>
+          <textarea class="field-input" id="addEmployeesInput" rows="5" style="width:100%;resize:vertical;font-family:'Tajawal',sans-serif;"></textarea>
+          <button class="login-btn" style="margin-top:10px;max-width:200px;" onclick="addEmployees(this)">حفظ</button>
+        </div>
+        <div style="padding:12px 24px;font-size:12px;color:var(--text-mid);">أعطِ كل موظف <b>رمز التفعيل</b> الخاص به، يستخدمه مرة وحدة عند أول دخول لإنشاء كلمة المرور. إذا نسي كلمة المرور اضغط "إعادة تعيين" وأعطه الرمز الجديد.</div>
+        <div id="managerEmployeesBody"></div>
+      </div>
     </div>
   </div>
 </div>
@@ -1208,20 +1238,12 @@ let ordersCache = [];
 let ordersReady = false;
 let ordersUnsub = null;
 let ordersWanted = false;
+// Everyone signs in with a password (manager, viewer, or an activated seller);
+// there are no anonymous sessions. Resolves with the user, or null.
 const authReady = new Promise((resolve)=>{
-  // Only fall back to an anonymous session when nobody is signed in, so a
-  // persisted manager (password) session survives a page reload
   fbAuth.onAuthStateChanged(user=>{
-    if(user){
-      resolve(user);
-      // The listener dies if auth briefly drops (e.g. manager logout); bring it back
-      if(ordersWanted && !ordersUnsub) startOrdersListener();
-      return;
-    }
-    fbAuth.signInAnonymously().catch(err=>{
-      console.error('Firebase auth error', err);
-      showToast('تعذّر الاتصال بالخادم، تحقق من الإنترنت','⚠️','toast-warning');
-    });
+    resolve(user);
+    if(user && ordersWanted && !ordersUnsub) startOrdersListener();
   });
 });
 function stopOrdersListener(){
@@ -1229,8 +1251,15 @@ function stopOrdersListener(){
 }
 function startOrdersListener(){
   ordersWanted = true;
-  if(ordersUnsub) return;
-  ordersUnsub = db.collection('orders').onSnapshot(snap=>{
+  if(ordersUnsub || !fbAuth.currentUser) return;
+  // Sellers may only read their own orders (enforced by the Firestore rules too)
+  let query = db.collection('orders');
+  if(!isManagerAuthed()){
+    const code = getSellerCode();
+    if(!code) return;
+    query = query.where('sellerCode','==',code);
+  }
+  ordersUnsub = query.onSnapshot(snap=>{
     // Sort client-side (not via .orderBy) so any legacy document without
     // a createdAt field still shows up instead of being silently excluded.
     ordersCache = snap.docs.map(d=>({ id:d.id, ...d.data() })).sort((a,b)=>(a.createdAt||0)-(b.createdAt||0));
@@ -1239,6 +1268,12 @@ function startOrdersListener(){
   }, err=>{
     console.error('Firestore listen error', err);
     ordersUnsub = null;
+    if(err.code==='permission-denied' && !isManagerAuthed()){
+      // Account was disabled or reset by the manager
+      globalLogout();
+      showToast('تم إيقاف الحساب أو إعادة تعيينه، تواصل مع المدير','⚠️','toast-warning');
+      return;
+    }
     // Retry; onAuthStateChanged also restarts it once a user is signed in again
     setTimeout(()=>{ if(ordersWanted && !ordersUnsub && fbAuth.currentUser) startOrdersListener(); }, 2000);
   });
@@ -2441,7 +2476,7 @@ const MANAGER_CODE = 'D1672';
 // Seller codes - any non-empty code is accepted as a seller
 // Sellers use their own code as password
 
-function doLogin(){
+async function doLogin(){
   const code = document.getElementById('loginCodeInput').value.trim().toUpperCase();
   const errEl = document.getElementById('loginError');
   if(!code){ errEl.textContent='الرجاء إدخال الكود الوظيفي'; return; }
@@ -2453,10 +2488,19 @@ function doLogin(){
     pwLoginTarget = code === VIEWER_CODE ? 'viewer' : 'manager';
     showManagerPwStep();
   } else if(code.length >= 3) {
-    // Seller login - accept any code 3+ chars
-    sessionStorage.setItem('mkrm_user', JSON.stringify({code, role:'seller'}));
-    document.getElementById('loginPage').classList.add('hidden');
-    startApp(code);
+    // Sellers must be on the manager's employee list
+    errEl.textContent='جارٍ التحقق...';
+    try{
+      const snap = await db.collection('logins').doc(code).get();
+      if(!snap.exists){ errEl.textContent='كود غير معرّف، تواصل مع المدير'; return; }
+      pendingSeller = { code, n: snap.data().n||0 };
+      pwLoginTarget = 'seller';
+      errEl.textContent='';
+      showManagerPwStep();
+    }catch(err){
+      console.error('login lookup error', err);
+      errEl.textContent='تعذّر الاتصال، تحقق من الإنترنت';
+    }
   } else {
     errEl.textContent='كود غير صالح، يجب أن يكون 3 أحرف على الأقل';
     document.getElementById('loginCodeInput').value='';
@@ -2468,12 +2512,31 @@ const MANAGER_EMAIL = 'd1672@makarm-sales.app';
 // Read-only account: sees the manager dashboard with every edit control hidden
 const VIEWER_CODE = '12345';
 const VIEWER_EMAIL = 'v12345@makarm-sales.app';
-let pwLoginTarget = 'manager';
-function pwLoginEmail(){ return pwLoginTarget==='viewer' ? VIEWER_EMAIL : MANAGER_EMAIL; }
+let pwLoginTarget = 'manager'; // 'manager' | 'viewer' | 'seller'
+// Seller accounts: <code>-<n>@makarm-sales.app. The manager's "reset" bumps n,
+// which gives the employee a fresh account (the old one loses all access).
+let pendingSeller = null; // { code, n }
+function sellerEmail(code, n){ return `${code.toLowerCase()}-${n}@makarm-sales.app`; }
+function pwLoginEmail(){
+  if(pwLoginTarget==='seller') return sellerEmail(pendingSeller.code, pendingSeller.n);
+  return pwLoginTarget==='viewer' ? VIEWER_EMAIL : MANAGER_EMAIL;
+}
+function pwFirstTimeClick(){
+  if(pwLoginTarget==='seller') showActivationStep(); else managerSetFirstPassword();
+}
+function showActivationStep(){
+  document.getElementById('managerPwStep').style.display='none';
+  document.getElementById('activationStep').style.display='';
+  document.getElementById('activationTitle').textContent = `تفعيل الحساب لأول مرة — ${pendingSeller.code}`;
+  ['actCodeInput','actPwInput','actPw2Input'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('activationError').textContent='';
+  setTimeout(()=>document.getElementById('actCodeInput').focus(),50);
+}
 function showManagerPwStep(){
-  const viewer = pwLoginTarget==='viewer';
-  document.getElementById('managerPwTitle').textContent = viewer ? '👁 دخول الاطلاع — أدخل كلمة المرور' : '🔒 دخول المدير — أدخل كلمة المرور';
-  document.getElementById('managerPwBtn').textContent = viewer ? 'دخول ✦' : 'دخول المدير ✦';
+  const viewer = pwLoginTarget==='viewer', seller = pwLoginTarget==='seller';
+  document.getElementById('managerPwTitle').textContent = seller ? `🔒 ${pendingSeller.code} — أدخل كلمة المرور` : viewer ? '👁 دخول الاطلاع — أدخل كلمة المرور' : '🔒 دخول المدير — أدخل كلمة المرور';
+  document.getElementById('managerPwBtn').textContent = viewer||seller ? 'دخول ✦' : 'دخول المدير ✦';
+  document.getElementById('managerPwFirstLink').textContent = seller ? 'أول دخول؟ تفعيل الحساب' : 'تعيين كلمة المرور لأول مرة';
   document.getElementById('loginCodeStep').style.display='none';
   document.getElementById('managerPwStep').style.display='';
   document.getElementById('managerPwError').textContent='';
@@ -2482,6 +2545,7 @@ function showManagerPwStep(){
 }
 function backToCodeStep(){
   document.getElementById('managerPwStep').style.display='none';
+  document.getElementById('activationStep').style.display='none';
   document.getElementById('loginCodeStep').style.display='';
   document.getElementById('loginCodeInput').value='';
   document.getElementById('loginError').textContent='';
@@ -2499,12 +2563,14 @@ async function managerPasswordLogin(){
   if(!pw){ errEl.textContent='الرجاء إدخال كلمة المرور'; return; }
   try{
     await fbAuth.signInWithEmailAndPassword(pwLoginEmail(), pw);
-    enterManagerPage();
+    if(pwLoginTarget==='seller') await enterSellerAccount(errEl);
+    else enterManagerPage();
   }catch(err){
-    console.error('manager login error', err.code);
+    console.error('login error', err.code);
     errEl.textContent = err.code==='auth/operation-not-allowed'
       ? 'تسجيل الدخول بكلمة المرور غير مفعّل في Firebase بعد'
       : err.code==='auth/too-many-requests' ? 'محاولات كثيرة، حاول لاحقًا'
+      : pwLoginTarget==='seller' ? 'كلمة المرور غير صحيحة. إذا هذا أول دخول لك اضغط (تفعيل الحساب)'
       : 'كلمة المرور غير صحيحة';
   }
 }
@@ -2526,6 +2592,74 @@ async function managerSetFirstPassword(){
   }
 }
 // True for both the manager and the read-only viewer (both use the dashboard)
+// After a seller signs in, make sure the account is still linked to the code
+async function enterSellerAccount(errEl){
+  const code = pendingSeller.code;
+  const prof = await db.collection('sellers').doc(fbAuth.currentUser.uid).get().catch(()=>null);
+  if(!prof || !prof.exists || prof.data().code!==code){
+    await fbAuth.signOut();
+    errEl.textContent='الحساب غير مفعّل أو تم إعادة تعيينه، تواصل مع المدير';
+    return;
+  }
+  let name = '';
+  try{ const emp = await db.collection('employees').doc(code).get(); name = emp.exists ? (emp.data().name||'') : ''; }catch(e){}
+  sessionStorage.setItem('mkrm_user', JSON.stringify({code, role:'seller', name}));
+  document.getElementById('loginPage').classList.add('hidden');
+  backToCodeStep();
+  startApp(code);
+  if(name) showToast(`أهلاً ${name} 👋`,'','toast-info');
+}
+async function activateSellerAccount(){
+  const errEl = document.getElementById('activationError');
+  const act = document.getElementById('actCodeInput').value.trim().toUpperCase();
+  const pw = document.getElementById('actPwInput').value;
+  const pw2 = document.getElementById('actPw2Input').value;
+  if(!act){ errEl.textContent='أدخل رمز التفعيل اللي أعطاك إياه المدير'; return; }
+  if(pw.length < 6){ errEl.textContent='كلمة المرور لازم تكون 6 أحرف أو أكثر'; return; }
+  if(pw !== pw2){ errEl.textContent='كلمتا المرور غير متطابقتين'; return; }
+  const btn = document.getElementById('activationBtn');
+  if(btn.disabled) return;
+  setBusy(btn, true, 'جارٍ التفعيل...');
+  const { code, n } = pendingSeller;
+  const email = sellerEmail(code, n);
+  let cred, created = false;
+  try{
+    try{
+      cred = await fbAuth.createUserWithEmailAndPassword(email, pw);
+      created = true;
+    }catch(err){
+      if(err.code!=='auth/email-already-in-use') throw err;
+      // A previous attempt created the login but didn't finish linking it
+      try{ cred = await fbAuth.signInWithEmailAndPassword(email, pw); }
+      catch(e){ errEl.textContent='الحساب مفعّل مسبقًا. ارجع وادخل بكلمة المرور، أو اطلب من المدير إعادة التعيين'; return; }
+    }
+    const uid = cred.user.uid;
+    // The rules accept this only if the activation code matches the manager's
+    // and nobody has claimed this employee code yet
+    try{
+      const batch = db.batch();
+      batch.set(db.collection('claims').doc(code), { uid, at: Date.now() });
+      batch.set(db.collection('sellers').doc(uid), { code, activation: act, at: Date.now() });
+      await batch.commit();
+    }catch(err){
+      console.error('activation rejected', err);
+      if(created) await cred.user.delete().catch(()=>fbAuth.signOut());
+      else await fbAuth.signOut();
+      errEl.textContent='رمز التفعيل غير صحيح، أو الحساب موقوف، أو مفعّل مسبقًا';
+      return;
+    }
+    await enterSellerAccount(errEl);
+    showToast('تم تفعيل حسابك ✓','✓','toast-success');
+  }catch(err){
+    console.error('activation error', err.code);
+    errEl.textContent = err.code==='auth/weak-password' ? 'كلمة المرور ضعيفة، اختر أطول'
+      : err.code==='auth/too-many-requests' ? 'محاولات كثيرة، حاول لاحقًا'
+      : 'تعذّر التفعيل، تحقق من الإنترنت وحاول مجددًا';
+  }finally{
+    setBusy(btn, false);
+  }
+}
+
 function isManagerAuthed(){
   const email = fbAuth.currentUser && fbAuth.currentUser.email;
   return email === MANAGER_EMAIL || email === VIEWER_EMAIL;
@@ -2550,7 +2684,9 @@ function startApp(sellerCode){
 // Orders storage (Firestore-backed, synced live across devices)
 async function saveOrder(orderData){
   await authReady;
-  await db.collection('orders').add({ ...orderData, thread:[], createdAt: Date.now() });
+  let sellerName = '';
+  try{ sellerName = JSON.parse(sessionStorage.getItem('mkrm_user')||'{}').name||''; }catch(e){}
+  await db.collection('orders').add({ ...orderData, sellerName, thread:[], createdAt: Date.now() });
 }
 function getOrders(){
   return ordersCache;
@@ -2620,10 +2756,131 @@ async function hideOrderForSeller(orderId){
   }
 }
 
+// ── Employees (manager only) ────────────────────────────
+let employeesCache = {}, claimsCache = {}, employeesUnsubs = [];
+function startEmployeesListener(){
+  if(employeesUnsubs.length) return;
+  const onErr = err=>console.error('employees listen error', err);
+  employeesUnsubs.push(db.collection('employees').onSnapshot(snap=>{
+    employeesCache = {}; snap.forEach(d=>employeesCache[d.id]=d.data());
+    refreshEmployeeViews();
+  }, onErr));
+  employeesUnsubs.push(db.collection('claims').onSnapshot(snap=>{
+    claimsCache = {}; snap.forEach(d=>claimsCache[d.id]=d.data());
+    refreshEmployeeViews();
+  }, onErr));
+}
+function stopEmployeesListener(){
+  employeesUnsubs.forEach(u=>u()); employeesUnsubs = []; employeesCache = {}; claimsCache = {};
+}
+function refreshEmployeeViews(){
+  if(!document.getElementById('managerPage')?.classList.contains('show')) return;
+  if(document.getElementById('mpanel-employees')?.classList.contains('show')) renderEmployeesTable();
+  renderManagerTable();
+  if(document.getElementById('mpanel-invoices')?.classList.contains('show')) renderManagerInvoicesTable();
+}
+function sellerNameOf(o){
+  return (employeesCache[o.sellerCode] && employeesCache[o.sellerCode].name) || o.sellerName || '';
+}
+function genActivationCode(){
+  const A = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789'; // no look-alike characters
+  return [...crypto.getRandomValues(new Uint8Array(8))].map(x=>A[x % A.length]).join('');
+}
+function toggleAddEmployees(){
+  const b = document.getElementById('addEmployeesBox');
+  b.style.display = b.style.display==='none' ? '' : 'none';
+}
+async function addEmployees(btn){
+  const lines = document.getElementById('addEmployeesInput').value.split('\n').map(l=>l.trim()).filter(Boolean);
+  const items = [], bad = [];
+  lines.forEach(l=>{
+    const m = l.match(/^([A-Za-z0-9]{3,10})\s+(.+)$/);
+    const code = m && m[1].toUpperCase();
+    if(!m || code===MANAGER_CODE || code===VIEWER_CODE) bad.push(l); else items.push({ code, name: m[2].trim() });
+  });
+  if(bad.length){ showToast(`سطر غير صحيح: ${bad[0]}`,'⚠️','toast-warning'); return; }
+  const fresh = items.filter(i=>!employeesCache[i.code]);
+  if(!fresh.length){ showToast('لا يوجد موظفين جدد للإضافة','⚠️','toast-warning'); return; }
+  setBusy(btn, true, 'جارٍ الحفظ...');
+  try{
+    const batch = db.batch();
+    fresh.forEach(i=>{
+      batch.set(db.collection('employees').doc(i.code), { name:i.name, active:true, activation:genActivationCode(), loginN:0, createdAt:Date.now() });
+      batch.set(db.collection('logins').doc(i.code), { n:0 });
+    });
+    await batch.commit();
+    document.getElementById('addEmployeesInput').value='';
+    toggleAddEmployees();
+    showToast(`تمت إضافة ${fresh.length} موظف ✓`,'✓','toast-success');
+  }catch(err){
+    console.error('addEmployees error', err);
+    showToast('تعذّر الحفظ، حاول مجددًا','⚠️','toast-warning');
+  }finally{ setBusy(btn, false); }
+}
+async function setEmployeeActive(code, active){
+  try{ await db.collection('employees').doc(code).update({ active }); }
+  catch(err){ console.error(err); showToast('تعذّر الحفظ، حاول مجددًا','⚠️','toast-warning'); }
+}
+// Gives the employee a new activation code and a brand-new login; the old
+// password/account stops working immediately
+async function resetEmployee(code){
+  if(!await askConfirm(`إعادة تعيين حساب ${code}؟ كلمة المرور الحالية بتتوقف ويحتاج رمز تفعيل جديد.`, 'إعادة تعيين')) return;
+  const emp = employeesCache[code]; if(!emp) return;
+  const n = (emp.loginN||0) + 1;
+  try{
+    const batch = db.batch();
+    batch.update(db.collection('employees').doc(code), { activation:genActivationCode(), loginN:n, active:true });
+    batch.set(db.collection('logins').doc(code), { n });
+    const claim = claimsCache[code];
+    if(claim){ batch.delete(db.collection('claims').doc(code)); batch.delete(db.collection('sellers').doc(claim.uid)); }
+    await batch.commit();
+    showToast('تمت إعادة التعيين ✓ أعطِ الموظف رمز التفعيل الجديد','✓','toast-success');
+  }catch(err){ console.error(err); showToast('تعذّر إعادة التعيين، حاول مجددًا','⚠️','toast-warning'); }
+}
+async function deleteEmployee(code){
+  if(!await askConfirm(`حذف الموظف ${code} من القائمة؟ ما يقدر يدخل بعدها (طلباته القديمة تبقى).`)) return;
+  try{
+    const batch = db.batch();
+    batch.delete(db.collection('employees').doc(code));
+    batch.delete(db.collection('logins').doc(code));
+    const claim = claimsCache[code];
+    if(claim){ batch.delete(db.collection('claims').doc(code)); batch.delete(db.collection('sellers').doc(claim.uid)); }
+    await batch.commit();
+    showToast('تم الحذف ✓','✓','toast-success');
+  }catch(err){ console.error(err); showToast('تعذّر الحذف، حاول مجددًا','⚠️','toast-warning'); }
+}
+function renderEmployeesTable(){
+  const body = document.getElementById('managerEmployeesBody');
+  if(!body) return;
+  const codes = Object.keys(employeesCache).sort();
+  if(!codes.length){ body.innerHTML='<div class="manager-empty">لا يوجد موظفين بعد. اضغط "إضافة موظفين"</div>'; return; }
+  const btn = 'border-radius:8px;padding:5px 10px;font-family:Tajawal,sans-serif;font-size:12px;font-weight:600;cursor:pointer;';
+  const rows = codes.map(code=>{
+    const e = employeesCache[code], claimed = !!claimsCache[code];
+    const status = !e.active ? '<span style="color:#e53e3e;font-weight:700;">موقوف</span>'
+      : claimed ? '<span style="color:#2f9e5b;font-weight:700;">مفعّل ✓</span>'
+      : '<span style="color:#d08a1a;font-weight:700;">بانتظار التفعيل</span>';
+    const act = claimed ? '—' : `<span class="req-badge" dir="ltr" style="font-family:monospace;letter-spacing:1px;user-select:all;">${esc(e.activation)}</span>`;
+    return `<tr>
+      <td><strong>${esc(code)}</strong></td>
+      <td>${esc(e.name)}</td>
+      <td style="white-space:nowrap">${status}</td>
+      <td>${act}</td>
+      <td style="white-space:nowrap">
+        <button onclick="setEmployeeActive('${esc(code)}', ${!e.active})" style="${btn}background:rgba(111,34,38,0.06);border:1px solid rgba(111,34,38,0.15);color:var(--primary);">${e.active?'إيقاف':'تشغيل'}</button>
+        <button onclick="resetEmployee('${esc(code)}')" style="${btn}background:rgba(201,169,110,0.12);border:1px solid rgba(201,169,110,0.35);color:var(--text-dark);">إعادة تعيين</button>
+        <button onclick="deleteEmployee('${esc(code)}')" title="حذف" style="${btn}background:rgba(229,62,62,0.08);border:1px solid rgba(229,62,62,0.2);color:#e53e3e;">🗑</button>
+      </td>
+    </tr>`;
+  }).join('');
+  body.innerHTML = `<table class="req-table"><thead><tr><th>الكود</th><th>الاسم</th><th>الحالة</th><th>رمز التفعيل</th><th>إجراءات</th></tr></thead><tbody>${rows}</tbody></table>`;
+}
+
 function showManagerPage(){
   showGlobalLogout();
   startOrdersListener();
   document.body.classList.toggle('viewer-mode', isViewer());
+  if(!isViewer()) startEmployeesListener();
   document.getElementById('managerPage').classList.add('show');
   renderManagerTable();
 }
@@ -2634,6 +2891,7 @@ function switchManagerTab(tab){
   document.getElementById('mtab-'+tab).classList.add('active');
   document.getElementById('mpanel-'+tab).classList.add('show');
   if(tab==='invoices') renderManagerInvoicesTable();
+  if(tab==='employees') renderEmployeesTable();
 }
 
 function renderManagerTable(){
@@ -2674,7 +2932,7 @@ function renderManagerTable(){
     const replyIndicator = hasNewReply ? `<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#f59e0b;margin-left:4px;" title="رد من البائع"></span>` : '';
     return `<tr>
       <td><span class="req-badge">${esc(o.reqNumber)||'—'}</span></td>
-      <td><strong>${esc(o.sellerCode)||'—'}</strong></td>
+      <td><strong>${esc(o.sellerCode)||'—'}</strong>${sellerNameOf(o)?`<div style="font-size:11px;color:var(--text-mid);">${esc(sellerNameOf(o))}</div>`:''}</td>
       <td>${esc(o.branchCode)||'—'}</td>
       <td style="white-space:nowrap">${esc(o.date)||'—'}${esc(timeStr)}</td>
       <td class="req-detail-cell">${catChips||'—'}</td>
@@ -2729,7 +2987,7 @@ function renderManagerInvoicesTable(){
     const replyIndicator = hasNewReply ? `<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#f59e0b;margin-left:4px;" title="رد من البائع"></span>` : '';
     return `<tr>
       <td><span class="req-badge">${esc(o.invoiceNumber)}</span></td>
-      <td><strong>${esc(o.sellerCode)||'—'}</strong></td>
+      <td><strong>${esc(o.sellerCode)||'—'}</strong>${sellerNameOf(o)?`<div style="font-size:11px;color:var(--text-mid);">${esc(sellerNameOf(o))}</div>`:''}</td>
       <td>${esc(o.branchCode)||'—'}</td>
       <td style="white-space:nowrap">${esc(o.date)||'—'}${esc(timeStr)}</td>
       <td style="text-align:center"><input type="checkbox" style="width:18px;height:18px;cursor:pointer;" ${o.registered?'checked':''} onchange="setInvoiceRegistered('${o.id}', this.checked)" title="تم التسجيل"></td>
@@ -3015,13 +3273,13 @@ async function exportManagerPDF(){
 // ══════════════════════════════════════════════════════
 function globalLogout() {
   sessionStorage.removeItem('mkrm_user');
-  // Drop the manager's password session and go back to an anonymous one
-  if(isManagerAuthed()){
-    // Detach first so the brief signed-out moment doesn't error the listener;
-    // onAuthStateChanged re-attaches it once the anonymous session is back
-    stopOrdersListener();
-    fbAuth.signOut().catch(err=>console.error('signout error', err));
-  }
+  // Detach first so the signed-out moment doesn't error the listener, and
+  // clear cached data so the next person on this device can't see it
+  ordersWanted = false;
+  stopOrdersListener();
+  stopEmployeesListener();
+  ordersCache = [];
+  if(fbAuth.currentUser) fbAuth.signOut().catch(err=>console.error('signout error', err));
   // hide everything, show login
   document.getElementById('mainHeader').style.display = 'none';
   document.querySelector('.progress-bar-wrap').style.display = 'none';
@@ -3125,8 +3383,16 @@ window.addEventListener('DOMContentLoaded',()=>{
         });
         return;
       } else {
-        // seller - load app + show their orders tab
-        startApp(user.code);
+        // seller: the stored code alone isn't enough, the account must still be linked
+        authReady.then(async u=>{
+          const prof = u ? await db.collection('sellers').doc(u.uid).get().catch(()=>null) : null;
+          if(prof && prof.exists && prof.data().code===user.code) startApp(user.code);
+          else {
+            sessionStorage.removeItem('mkrm_user');
+            if(u) fbAuth.signOut();
+            document.getElementById('loginPage').classList.remove('hidden');
+          }
+        });
       }
     } catch(e){ sessionStorage.removeItem('mkrm_user'); }
   }
