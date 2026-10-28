@@ -5,15 +5,21 @@ service cloud.firestore {
     function signedIn() { return request.auth != null; }
     function email() { return signedIn() ? request.auth.token.get('email', '') : ''; }
     function isManager() { return email() == 'd1672@makarm-sales.app'; }
-    function isViewer() { return email() == 'v12345@makarm-sales.app'; }
+    // Legacy read-only account (before roles existed)
+    function isLegacyViewer() { return email() == 'v12345@makarm-sales.app'; }
     function sellerProfile() { return get(/databases/$(database)/documents/sellers/$(request.auth.uid)); }
     function myCode() { return sellerProfile().data.code; }
-    // An activated seller whose employee entry is still switched on
-    function isSeller() {
+    function myEmployee() { return get(/databases/$(database)/documents/employees/$(myCode())); }
+    // An activated employee whose entry is still switched on
+    function isLinked() {
       return signedIn()
         && exists(/databases/$(database)/documents/sellers/$(request.auth.uid))
-        && get(/databases/$(database)/documents/employees/$(myCode())).data.active == true;
+        && myEmployee().data.active == true;
     }
+    function myRole() { return myEmployee().data.get('role', 'seller'); }
+    function isSeller() { return isLinked() && myRole() == 'seller'; }
+    function isViewer() { return isLegacyViewer() || (isLinked() && myRole() == 'viewer'); }
+    function isSupervisor() { return isLinked() && myRole() == 'supervisor'; }
 
     // Public lookup used by the login screen: only "does this code exist" + login counter
     match /logins/{code} {
@@ -22,9 +28,9 @@ service cloud.firestore {
       allow write: if isManager();
     }
 
-    // Employee list: manager only (a seller may read their own entry)
+    // Employee list: manager only (an employee may read their own entry)
     match /employees/{code} {
-      allow read: if isManager() || (isSeller() && myCode() == code);
+      allow read: if isManager() || (isLinked() && myCode() == code);
       allow write: if isManager();
     }
 
@@ -49,10 +55,10 @@ service cloud.firestore {
     }
 
     match /orders/{id} {
-      allow read: if isManager() || isViewer()
+      allow read: if isManager() || isViewer() || isSupervisor()
         || (isSeller() && resource.data.sellerCode == myCode());
       allow create: if isSeller() && request.resource.data.sellerCode == myCode();
-      allow update: if isManager()
+      allow update: if isManager() || isSupervisor()
         || (isSeller() && resource.data.sellerCode == myCode()
             && request.resource.data.sellerCode == myCode());
       allow delete: if false;

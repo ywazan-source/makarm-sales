@@ -848,6 +848,12 @@ body.viewer-mode #managerPage .clear-btn,
 body.viewer-mode #managerPage [onclick*="hideOrderForManager"],
 body.viewer-mode #orderDetailFoot,
 body.viewer-mode #mtab-employees{display:none !important;}
+.supervisor-badge{display:none;margin-top:6px;font-size:12px;font-weight:700;color:var(--primary);background:rgba(201,169,110,0.18);border:1px solid rgba(201,169,110,0.4);border-radius:20px;padding:3px 12px;width:fit-content;}
+body.supervisor-mode .supervisor-badge{display:inline-block;}
+/* Supervisor: full dashboard except employee admin and deleting */
+body.supervisor-mode #mtab-employees,
+body.supervisor-mode #managerPage .clear-btn,
+body.supervisor-mode #managerPage [onclick*="hideOrderForManager"]{display:none !important;}
 body.viewer-mode #managerInstallBody input,
 body.viewer-mode #managerInvoicesBody input{pointer-events:none;opacity:0.75;}
 /* Softer cards: one shared layered shadow, gentler borders, rounder corners */
@@ -945,6 +951,7 @@ body.viewer-mode #managerInvoicesBody input{pointer-events:none;opacity:0.75;}
       <div class="manager-title">🏢 لوحة مدير الفروع</div>
       <div class="manager-sub">تقارير الطلبات الواردة</div>
       <div class="viewer-badge">👁 وضع الاطلاع فقط</div>
+      <div class="supervisor-badge">🧑‍💼 وضع المشرف</div>
     </div>
   </div>
   <div class="manager-body">
@@ -1006,9 +1013,17 @@ body.viewer-mode #managerInvoicesBody input{pointer-events:none;opacity:0.75;}
         <div id="addEmployeesBox" style="display:none;padding:16px 24px;border-bottom:1px solid rgba(201,169,110,0.15);">
           <div style="font-size:13px;color:var(--text-mid);margin-bottom:8px;">كل موظف في سطر: <b>الكود</b> ثم <b>الاسم</b>. مثال: <span dir="ltr">D5777 عبد العزيز</span></div>
           <textarea class="field-input" id="addEmployeesInput" rows="5" style="width:100%;resize:vertical;font-family:'Tajawal',sans-serif;"></textarea>
+          <div style="display:flex;align-items:center;gap:10px;margin-top:10px;font-size:13px;color:var(--text-mid);">
+            <span>الصلاحية:</span>
+            <select class="field-input" id="addEmployeesRole" style="width:auto;padding:8px 14px;">
+              <option value="seller">بائع</option>
+              <option value="viewer">مطّلع</option>
+              <option value="supervisor">مشرف</option>
+            </select>
+          </div>
           <button class="login-btn" style="margin-top:10px;max-width:200px;" onclick="addEmployees(this)">حفظ</button>
         </div>
-        <div style="padding:12px 24px;font-size:12px;color:var(--text-mid);">أول دخول للموظف: يكتب كوده ويضغط "أنشئ كلمة المرور". إذا نسي كلمة المرور اضغط "إعادة تعيين" وينشئ واحدة جديدة.</div>
+        <div style="padding:12px 24px;font-size:12px;color:var(--text-mid);"><b>بائع</b>: يرسل طلبات وفواتير ويشوف حقه بس. <b>مطّلع</b>: يشوف لوحة المدير بدون أي تعديل. <b>مشرف</b>: يرد ويعدّل الحالات والتواريخ، بدون إدارة الموظفين أو الحذف.<br>أول دخول للموظف: يكتب كوده ويضغط "أنشئ كلمة المرور". إذا نسي كلمة المرور اضغط "إعادة تعيين" وينشئ واحدة جديدة.</div>
         <div id="managerEmployeesBody"></div>
       </div>
     </div>
@@ -2593,8 +2608,8 @@ async function doLogin(){
   // is a re-login in the same tab after a previous logout
   ['mainHeader'].forEach(id=>{ const el=document.getElementById(id); if(el) el.style.display=''; });
   document.querySelectorAll('.progress-bar-wrap, .app-layout, .fab').forEach(el=>{ el.style.display=''; });
-  if(code === MANAGER_CODE || code === VIEWER_CODE){
-    pwLoginTarget = code === VIEWER_CODE ? 'viewer' : 'manager';
+  if(code === MANAGER_CODE){
+    pwLoginTarget = 'manager';
     showManagerPwStep();
   } else if(code.length >= 3) {
     // Sellers must be on the manager's employee list
@@ -2700,23 +2715,41 @@ async function managerSetFirstPassword(){
       : 'تعذّر التعيين، حاول مجددًا';
   }
 }
-// True for both the manager and the read-only viewer (both use the dashboard)
-// After a seller signs in, make sure the account is still linked to the code
+// Employee permissions set by the manager: 'seller' (default), 'viewer'
+// (read-only dashboard) or 'supervisor' (dashboard without employee admin)
+const ROLE_LABELS = { seller:'بائع', viewer:'مطّلع', supervisor:'مشرف' };
+let staffRole = null; // 'viewer' | 'supervisor' while such an employee is signed in
+
+// Confirms the signed-in account is still linked to `code` and returns the
+// employee's { name, role }, or null if it isn't
+async function loadLinkedEmployee(code){
+  const prof = await db.collection('sellers').doc(fbAuth.currentUser.uid).get().catch(()=>null);
+  if(!prof || !prof.exists || prof.data().code!==code) return null;
+  let name = '', role = 'seller';
+  try{
+    const emp = await db.collection('employees').doc(code).get();
+    if(emp.exists){ name = emp.data().name||''; role = emp.data().role||'seller'; }
+  }catch(e){}
+  return { name, role };
+}
+function enterLinkedAccount(code, emp){
+  staffRole = emp.role==='viewer' || emp.role==='supervisor' ? emp.role : null;
+  sessionStorage.setItem('mkrm_user', JSON.stringify({code, role: staffRole ? 'staff' : 'seller', name: emp.name}));
+  document.getElementById('loginPage').classList.add('hidden');
+  backToCodeStep();
+  if(staffRole) showManagerPage(); else startApp(code);
+}
+// After an employee signs in, make sure the account is still linked to the code
 async function enterSellerAccount(errEl){
   const code = pendingSeller.code;
-  const prof = await db.collection('sellers').doc(fbAuth.currentUser.uid).get().catch(()=>null);
-  if(!prof || !prof.exists || prof.data().code!==code){
+  const emp = await loadLinkedEmployee(code);
+  if(!emp){
     await fbAuth.signOut();
     errEl.textContent='الحساب غير مفعّل أو تم إعادة تعيينه، تواصل مع المدير';
     return;
   }
-  let name = '';
-  try{ const emp = await db.collection('employees').doc(code).get(); name = emp.exists ? (emp.data().name||'') : ''; }catch(e){}
-  sessionStorage.setItem('mkrm_user', JSON.stringify({code, role:'seller', name}));
-  document.getElementById('loginPage').classList.add('hidden');
-  backToCodeStep();
-  startApp(code);
-  if(name) showToast(`أهلاً ${name} 👋`,'','toast-info');
+  enterLinkedAccount(code, emp);
+  if(emp.name) showToast(`أهلاً ${emp.name} 👋`,'','toast-info');
 }
 async function activateSellerAccount(){
   const errEl = document.getElementById('activationError');
@@ -2767,12 +2800,16 @@ async function activateSellerAccount(){
   }
 }
 
+// True for everyone who uses the dashboard (manager, viewer, supervisor)
 function isManagerAuthed(){
   const email = fbAuth.currentUser && fbAuth.currentUser.email;
-  return email === MANAGER_EMAIL || email === VIEWER_EMAIL;
+  return email === MANAGER_EMAIL || email === VIEWER_EMAIL || (!!fbAuth.currentUser && !!staffRole);
+}
+function isRealManager(){
+  return !!fbAuth.currentUser && fbAuth.currentUser.email === MANAGER_EMAIL;
 }
 function isViewer(){
-  return !!fbAuth.currentUser && fbAuth.currentUser.email === VIEWER_EMAIL;
+  return !!fbAuth.currentUser && (fbAuth.currentUser.email === VIEWER_EMAIL || staffRole==='viewer');
 }
 
 function startApp(sellerCode){
@@ -2899,16 +2936,17 @@ async function addEmployees(btn){
   lines.forEach(l=>{
     const m = l.match(/^([A-Za-z0-9]{3,10})\s+(.+)$/);
     const code = m && m[1].toUpperCase();
-    if(!m || code===MANAGER_CODE || code===VIEWER_CODE) bad.push(l); else items.push({ code, name: m[2].trim() });
+    if(!m || code===MANAGER_CODE) bad.push(l); else items.push({ code, name: m[2].trim() });
   });
   if(bad.length){ showToast(`سطر غير صحيح: ${bad[0]}`,'⚠️','toast-warning'); return; }
   const fresh = items.filter(i=>!employeesCache[i.code]);
+  const role = document.getElementById('addEmployeesRole').value;
   if(!fresh.length){ showToast('لا يوجد موظفين جدد للإضافة','⚠️','toast-warning'); return; }
   setBusy(btn, true, 'جارٍ الحفظ...');
   try{
     const batch = db.batch();
     fresh.forEach(i=>{
-      batch.set(db.collection('employees').doc(i.code), { name:i.name, active:true, loginN:0, createdAt:Date.now() });
+      batch.set(db.collection('employees').doc(i.code), { name:i.name, role, active:true, loginN:0, createdAt:Date.now() });
       batch.set(db.collection('logins').doc(i.code), { n:0 });
     });
     await batch.commit();
@@ -2919,6 +2957,12 @@ async function addEmployees(btn){
     console.error('addEmployees error', err);
     showToast('تعذّر الحفظ، حاول مجددًا','⚠️','toast-warning');
   }finally{ setBusy(btn, false); }
+}
+async function setEmployeeRole(code, role){
+  try{
+    await db.collection('employees').doc(code).update({ role });
+    showToast(`تم تغيير الصلاحية إلى ${ROLE_LABELS[role]} ✓ (تطبق من الدخول القادم)`,'✓','toast-success');
+  }catch(err){ console.error(err); showToast('تعذّر الحفظ، حاول مجددًا','⚠️','toast-warning'); }
 }
 async function setEmployeeActive(code, active){
   try{ await db.collection('employees').doc(code).update({ active }); }
@@ -2966,6 +3010,9 @@ function renderEmployeesTable(){
     return `<tr>
       <td><strong>${esc(code)}</strong></td>
       <td>${esc(e.name)}</td>
+      <td><select class="field-input" style="padding:6px 10px;font-size:12px;width:auto;" onchange="setEmployeeRole('${esc(code)}', this.value)">
+        ${Object.entries(ROLE_LABELS).map(([k,v])=>`<option value="${k}" ${(e.role||'seller')===k?'selected':''}>${v}</option>`).join('')}
+      </select></td>
       <td style="white-space:nowrap">${status}</td>
       <td style="white-space:nowrap">
         <button onclick="setEmployeeActive('${esc(code)}', ${!e.active})" style="${btn}background:rgba(var(--primary-rgb),0.06);border:1px solid rgba(var(--primary-rgb),0.15);color:var(--primary);">${e.active?'إيقاف':'تشغيل'}</button>
@@ -2974,14 +3021,15 @@ function renderEmployeesTable(){
       </td>
     </tr>`;
   }).join('');
-  body.innerHTML = `<table class="req-table"><thead><tr><th>الكود</th><th>الاسم</th><th>الحالة</th><th>إجراءات</th></tr></thead><tbody>${rows}</tbody></table>`;
+  body.innerHTML = `<table class="req-table"><thead><tr><th>الكود</th><th>الاسم</th><th>الصلاحية</th><th>الحالة</th><th>إجراءات</th></tr></thead><tbody>${rows}</tbody></table>`;
 }
 
 function showManagerPage(){
   showGlobalLogout();
   startOrdersListener();
   document.body.classList.toggle('viewer-mode', isViewer());
-  if(!isViewer()) startEmployeesListener();
+  document.body.classList.toggle('supervisor-mode', staffRole==='supervisor');
+  if(isRealManager()) startEmployeesListener();
   document.getElementById('managerPage').classList.add('show');
   renderManagerTable();
 }
@@ -3419,6 +3467,8 @@ function globalLogout() {
   // Detach first so the signed-out moment doesn't error the listener, and
   // clear cached data so the next person on this device can't see it
   ordersWanted = false;
+  staffRole = null;
+  document.body.classList.remove('supervisor-mode');
   stopOrdersListener();
   stopEmployeesListener();
   ordersCache = [];
@@ -3518,6 +3568,18 @@ window.addEventListener('DOMContentLoaded',()=>{
     try{
       const user = JSON.parse(session);
       document.getElementById('loginPage').classList.add('hidden');
+      if(user.role==='staff'){
+        authReady.then(async u=>{
+          const emp = u ? await loadLinkedEmployee(user.code) : null;
+          if(emp) enterLinkedAccount(user.code, emp);
+          else {
+            sessionStorage.removeItem('mkrm_user');
+            if(u) fbAuth.signOut();
+            document.getElementById('loginPage').classList.remove('hidden');
+          }
+        });
+        return;
+      }
       if(user.role==='manager' || user.role==='viewer'){
         // A stored "manager" flag alone isn't enough: require the password session
         authReady.then(()=>{
@@ -3528,8 +3590,9 @@ window.addEventListener('DOMContentLoaded',()=>{
       } else {
         // seller: the stored code alone isn't enough, the account must still be linked
         authReady.then(async u=>{
-          const prof = u ? await db.collection('sellers').doc(u.uid).get().catch(()=>null) : null;
-          if(prof && prof.exists && prof.data().code===user.code) startApp(user.code);
+          const emp = u ? await loadLinkedEmployee(user.code) : null;
+          // The manager may have changed this employee's role since last time
+          if(emp) enterLinkedAccount(user.code, emp);
           else {
             sessionStorage.removeItem('mkrm_user');
             if(u) fbAuth.signOut();
