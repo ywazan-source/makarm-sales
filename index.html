@@ -1070,6 +1070,18 @@ body.viewer-mode #managerInvoicesBody input{pointer-events:none;opacity:0.75;}
   .request-card.rq .request-card-title{font-size:15px;}
   .rq-desc{font-size:12px;}
 }
+/* Mobile order bar: one compact row (details toggle + number + send) when collapsed */
+@media(max-width:1024px){
+  .summary-panel:not(.expanded){flex-direction:row;align-items:center;gap:8px;padding:8px 12px calc(8px + env(safe-area-inset-bottom));}
+  .summary-panel:not(.expanded) .summary-header{flex:1;min-width:0;padding:0;gap:6px;flex-wrap:nowrap;}
+  .summary-panel:not(.expanded) .summary-title{display:none;}
+  .summary-panel:not(.expanded) .req-num-badge{padding:5px 10px;font-size:11px;min-width:0;overflow:hidden;white-space:nowrap;}
+  .summary-panel:not(.expanded) .req-num-badge span:first-child{display:none;}
+  .summary-panel:not(.expanded) .summary-toggle{margin-inline-start:0;padding:7px 12px;white-space:nowrap;}
+  .summary-panel:not(.expanded) .summary-footer{padding:0;flex-shrink:0;}
+  .summary-panel:not(.expanded) .export-btn{width:auto;min-height:46px;padding:10px 22px;font-size:15px;}
+  body[data-tab="new"] .fab{bottom:84px;}
+}
 </style>
 </head>
 <body data-tab="new">
