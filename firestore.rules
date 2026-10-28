@@ -75,7 +75,8 @@ service cloud.firestore {
         || (isInstaller() && resource.data.install == true)
         || (isSeller() && resource.data.sellerCode == myCode());
       allow create: if (isManager() || isSupervisor()
-          || (isInstaller() && request.resource.data.install == true && request.resource.data.from == 'installer'))
+          || (isInstaller() && request.resource.data.install == true && request.resource.data.from == 'installer')
+          || (isSeller() && request.resource.data.sellerCode == myCode() && request.resource.data.from == 'seller'))
         && request.resource.data.data is string
         && request.resource.data.data.size() < 1000000;
       allow update, delete: if false;

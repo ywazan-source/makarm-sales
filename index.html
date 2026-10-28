@@ -2159,7 +2159,9 @@ function renderSellerOrders(){
       <div class="seller-order-thread">
         <div class="thread-title">المحادثة</div>
         ${thread}
+        <div id="attach-preview-${o.id}" class="manager-pdf-attach-preview">${attachChipHtml(o.id)}</div>
         <div class="thread-reply-row">
+          <button class="manager-attach-btn" onclick="managerAttachPDF('${o.id}')" title="إرفاق صور أو ملفات">📎</button>
           <textarea class="thread-reply-input" id="seller-reply-${o.id}" placeholder="ردّ على المدير..."></textarea>
           <button class="thread-reply-btn" onclick="sellerSendReply('${o.id}', this)">إرسال</button>
         </div>
@@ -2186,17 +2188,23 @@ function renderThreadBubbles(thread, viewer, orderIdx){
 async function sellerSendReply(orderId, btn){
   const input = document.getElementById(`seller-reply-${orderId}`);
   const text = input ? input.value.trim() : '';
-  if(!text) return;
+  const files = pendingAttachments.orderId===orderId ? pendingAttachments.files : [];
+  if(!text && !files.length) return;
   if(btn && btn.disabled) return;
+  const order = getOrders().find(o=>o.id===orderId);
+  if(!order) return;
   const msg = { id:newMsgId(), from:'seller', text, time: nowStamp() };
   setBusy(btn, true, '...');
   try{
     await authReady;
+    const refs = await uploadPendingAttachments(order, 'seller');
+    if(refs.length) msg.attachments = refs;
     // arrayUnion appends server-side, so a simultaneous reply from the
     // other side can't overwrite this one
     await withSlowNotice(db.collection('orders').doc(orderId).update({ thread: firebase.firestore.FieldValue.arrayUnion(msg) }), 'إرسال الرد');
     const cur = document.getElementById(`seller-reply-${orderId}`);
     if(cur) cur.value = '';
+    clearAttach(orderId);
     showToast('تم إرسال ردك','✓','toast-success');
   }catch(err){
     console.error('sellerSendReply error', err);
@@ -2267,14 +2275,7 @@ async function managerReply(orderId, btn){
   setBusy(btn, true, '...');
   try{
     await authReady;
-    const refs = [];
-    for(const f of files){
-      const ref = await db.collection('attachments').add({
-        orderId, sellerCode: order.sellerCode||'', install: !!order.withInstall,
-        name: f.name, type: f.type, data: f.dataUrl, from, at: Date.now()
-      });
-      refs.push({ id: ref.id, name: f.name, type: f.type });
-    }
+    const refs = await uploadPendingAttachments(order, from);
     const msg = { id:newMsgId(), from, text: text||'', time: nowStamp(), seenBySeller: false };
     if(refs.length) msg.attachments = refs;
     await withSlowNotice(db.collection('orders').doc(orderId).update({ thread: firebase.firestore.FieldValue.arrayUnion(msg) }), 'إرسال الرد');
@@ -2290,6 +2291,19 @@ async function managerReply(orderId, btn){
   }
 }
 
+// Saves the files picked for this order and returns { id, name, type } refs
+async function uploadPendingAttachments(order, from){
+  const files = pendingAttachments.orderId===order.id ? pendingAttachments.files : [];
+  const refs = [];
+  for(const f of files){
+    const ref = await db.collection('attachments').add({
+      orderId: order.id, sellerCode: order.sellerCode||'', install: !!order.withInstall,
+      name: f.name, type: f.type, data: f.dataUrl, from, at: Date.now()
+    });
+    refs.push({ id: ref.id, name: f.name, type: f.type });
+  }
+  return refs;
+}
 function attachChipHtml(orderId){
   if(pendingAttachments.orderId!==orderId) return '';
   return pendingAttachments.files.map((f,i)=>
