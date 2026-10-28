@@ -22,7 +22,7 @@ service cloud.firestore {
       allow write: if isManager();
     }
 
-    // Employee list with activation codes: manager only (a seller may read their own entry)
+    // Employee list: manager only (a seller may read their own entry)
     match /employees/{code} {
       allow read: if isManager() || (isSeller() && myCode() == code);
       allow write: if isManager();
@@ -37,13 +37,12 @@ service cloud.firestore {
       allow delete: if isManager();
     }
 
-    // Links a Firebase account to an employee code; needs the manager's activation code
+    // Links a Firebase account to an employee code (first come, first served; manager can reset)
     match /sellers/{uid} {
       allow read: if isManager() || (signedIn() && request.auth.uid == uid);
       allow create: if signedIn() && request.auth.uid == uid
-        && request.resource.data.keys().hasOnly(['code', 'activation', 'at'])
+        && request.resource.data.keys().hasOnly(['code', 'at'])
         && get(/databases/$(database)/documents/employees/$(request.resource.data.code)).data.active == true
-        && get(/databases/$(database)/documents/employees/$(request.resource.data.code)).data.activation == request.resource.data.activation
         && !exists(/databases/$(database)/documents/claims/$(request.resource.data.code))
         && getAfter(/databases/$(database)/documents/claims/$(request.resource.data.code)).data.uid == uid;
       allow delete: if isManager();

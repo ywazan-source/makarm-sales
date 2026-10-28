@@ -898,14 +898,12 @@ body.viewer-mode #managerInvoicesBody input{pointer-events:none;opacity:0.75;}
       </div>
     </div>
     <div id="activationStep" style="display:none;">
-      <div class="login-sub" id="activationTitle">تفعيل الحساب لأول مرة</div>
-      <input type="text" class="login-input" id="actCodeInput" placeholder="رمز التفعيل (من المدير)" autocomplete="off" maxlength="12"
-        oninput="this.value=this.value.toUpperCase()" style="margin-bottom:10px;">
+      <div class="login-sub" id="activationTitle">إنشاء كلمة المرور لأول مرة</div>
       <input type="password" class="login-input" id="actPwInput" placeholder="كلمة مرور جديدة (6 أحرف أو أكثر)" autocomplete="new-password" style="margin-bottom:10px;">
       <input type="password" class="login-input" id="actPw2Input" placeholder="تأكيد كلمة المرور" autocomplete="new-password"
         onkeydown="if(event.key==='Enter')activateSellerAccount()">
       <div class="login-error" id="activationError"></div>
-      <button class="login-btn" id="activationBtn" onclick="activateSellerAccount()">تفعيل ودخول ✦</button>
+      <button class="login-btn" id="activationBtn" onclick="activateSellerAccount()">إنشاء ودخول ✦</button>
       <div style="display:flex;justify-content:space-between;margin-top:14px;font-size:12px;">
         <a href="#" onclick="backToCodeStep();return false;" style="color:var(--text-mid);">→ رجوع</a>
       </div>
@@ -976,7 +974,7 @@ body.viewer-mode #managerInvoicesBody input{pointer-events:none;opacity:0.75;}
           <textarea class="field-input" id="addEmployeesInput" rows="5" style="width:100%;resize:vertical;font-family:'Tajawal',sans-serif;"></textarea>
           <button class="login-btn" style="margin-top:10px;max-width:200px;" onclick="addEmployees(this)">حفظ</button>
         </div>
-        <div style="padding:12px 24px;font-size:12px;color:var(--text-mid);">أعطِ كل موظف <b>رمز التفعيل</b> الخاص به، يستخدمه مرة وحدة عند أول دخول لإنشاء كلمة المرور. إذا نسي كلمة المرور اضغط "إعادة تعيين" وأعطه الرمز الجديد.</div>
+        <div style="padding:12px 24px;font-size:12px;color:var(--text-mid);">أول دخول للموظف: يكتب كوده ويضغط "أنشئ كلمة المرور". إذا نسي كلمة المرور اضغط "إعادة تعيين" وينشئ واحدة جديدة.</div>
         <div id="managerEmployeesBody"></div>
       </div>
     </div>
@@ -2527,16 +2525,16 @@ function pwFirstTimeClick(){
 function showActivationStep(){
   document.getElementById('managerPwStep').style.display='none';
   document.getElementById('activationStep').style.display='';
-  document.getElementById('activationTitle').textContent = `تفعيل الحساب لأول مرة — ${pendingSeller.code}`;
-  ['actCodeInput','actPwInput','actPw2Input'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('activationTitle').textContent = `إنشاء كلمة المرور لأول مرة — ${pendingSeller.code}`;
+  ['actPwInput','actPw2Input'].forEach(id=>document.getElementById(id).value='');
   document.getElementById('activationError').textContent='';
-  setTimeout(()=>document.getElementById('actCodeInput').focus(),50);
+  setTimeout(()=>document.getElementById('actPwInput').focus(),50);
 }
 function showManagerPwStep(){
   const viewer = pwLoginTarget==='viewer', seller = pwLoginTarget==='seller';
   document.getElementById('managerPwTitle').textContent = seller ? `🔒 ${pendingSeller.code} — أدخل كلمة المرور` : viewer ? '👁 دخول الاطلاع — أدخل كلمة المرور' : '🔒 دخول المدير — أدخل كلمة المرور';
   document.getElementById('managerPwBtn').textContent = viewer||seller ? 'دخول ✦' : 'دخول المدير ✦';
-  document.getElementById('managerPwFirstLink').textContent = seller ? 'أول دخول؟ تفعيل الحساب' : 'تعيين كلمة المرور لأول مرة';
+  document.getElementById('managerPwFirstLink').textContent = seller ? 'أول دخول؟ أنشئ كلمة المرور' : 'تعيين كلمة المرور لأول مرة';
   document.getElementById('loginCodeStep').style.display='none';
   document.getElementById('managerPwStep').style.display='';
   document.getElementById('managerPwError').textContent='';
@@ -2570,7 +2568,7 @@ async function managerPasswordLogin(){
     errEl.textContent = err.code==='auth/operation-not-allowed'
       ? 'تسجيل الدخول بكلمة المرور غير مفعّل في Firebase بعد'
       : err.code==='auth/too-many-requests' ? 'محاولات كثيرة، حاول لاحقًا'
-      : pwLoginTarget==='seller' ? 'كلمة المرور غير صحيحة. إذا هذا أول دخول لك اضغط (تفعيل الحساب)'
+      : pwLoginTarget==='seller' ? 'كلمة المرور غير صحيحة. إذا هذا أول دخول لك اضغط (أنشئ كلمة المرور)'
       : 'كلمة المرور غير صحيحة';
   }
 }
@@ -2611,10 +2609,8 @@ async function enterSellerAccount(errEl){
 }
 async function activateSellerAccount(){
   const errEl = document.getElementById('activationError');
-  const act = document.getElementById('actCodeInput').value.trim().toUpperCase();
   const pw = document.getElementById('actPwInput').value;
   const pw2 = document.getElementById('actPw2Input').value;
-  if(!act){ errEl.textContent='أدخل رمز التفعيل اللي أعطاك إياه المدير'; return; }
   if(pw.length < 6){ errEl.textContent='كلمة المرور لازم تكون 6 أحرف أو أكثر'; return; }
   if(pw !== pw2){ errEl.textContent='كلمتا المرور غير متطابقتين'; return; }
   const btn = document.getElementById('activationBtn');
@@ -2634,22 +2630,22 @@ async function activateSellerAccount(){
       catch(e){ errEl.textContent='الحساب مفعّل مسبقًا. ارجع وادخل بكلمة المرور، أو اطلب من المدير إعادة التعيين'; return; }
     }
     const uid = cred.user.uid;
-    // The rules accept this only if the activation code matches the manager's
-    // and nobody has claimed this employee code yet
+    // The rules accept this only if the employee is active and nobody has
+    // claimed this employee code yet
     try{
       const batch = db.batch();
       batch.set(db.collection('claims').doc(code), { uid, at: Date.now() });
-      batch.set(db.collection('sellers').doc(uid), { code, activation: act, at: Date.now() });
+      batch.set(db.collection('sellers').doc(uid), { code, at: Date.now() });
       await batch.commit();
     }catch(err){
       console.error('activation rejected', err);
       if(created) await cred.user.delete().catch(()=>fbAuth.signOut());
       else await fbAuth.signOut();
-      errEl.textContent='رمز التفعيل غير صحيح، أو الحساب موقوف، أو مفعّل مسبقًا';
+      errEl.textContent='الحساب موقوف أو مفعّل مسبقًا، تواصل مع المدير';
       return;
     }
     await enterSellerAccount(errEl);
-    showToast('تم تفعيل حسابك ✓','✓','toast-success');
+    showToast('تم إنشاء حسابك ✓','✓','toast-success');
   }catch(err){
     console.error('activation error', err.code);
     errEl.textContent = err.code==='auth/weak-password' ? 'كلمة المرور ضعيفة، اختر أطول'
@@ -2782,10 +2778,6 @@ function refreshEmployeeViews(){
 function sellerNameOf(o){
   return (employeesCache[o.sellerCode] && employeesCache[o.sellerCode].name) || o.sellerName || '';
 }
-function genActivationCode(){
-  const A = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789'; // no look-alike characters
-  return [...crypto.getRandomValues(new Uint8Array(8))].map(x=>A[x % A.length]).join('');
-}
 function toggleAddEmployees(){
   const b = document.getElementById('addEmployeesBox');
   b.style.display = b.style.display==='none' ? '' : 'none';
@@ -2805,7 +2797,7 @@ async function addEmployees(btn){
   try{
     const batch = db.batch();
     fresh.forEach(i=>{
-      batch.set(db.collection('employees').doc(i.code), { name:i.name, active:true, activation:genActivationCode(), loginN:0, createdAt:Date.now() });
+      batch.set(db.collection('employees').doc(i.code), { name:i.name, active:true, loginN:0, createdAt:Date.now() });
       batch.set(db.collection('logins').doc(i.code), { n:0 });
     });
     await batch.commit();
@@ -2821,20 +2813,20 @@ async function setEmployeeActive(code, active){
   try{ await db.collection('employees').doc(code).update({ active }); }
   catch(err){ console.error(err); showToast('تعذّر الحفظ، حاول مجددًا','⚠️','toast-warning'); }
 }
-// Gives the employee a new activation code and a brand-new login; the old
-// password/account stops working immediately
+// Gives the employee a brand-new login; the old password stops working
+// immediately and they create a new one on next sign-in
 async function resetEmployee(code){
-  if(!await askConfirm(`إعادة تعيين حساب ${code}؟ كلمة المرور الحالية بتتوقف ويحتاج رمز تفعيل جديد.`, 'إعادة تعيين')) return;
+  if(!await askConfirm(`إعادة تعيين حساب ${code}؟ كلمة المرور الحالية بتتوقف ويقدر ينشئ كلمة مرور جديدة.`, 'إعادة تعيين')) return;
   const emp = employeesCache[code]; if(!emp) return;
   const n = (emp.loginN||0) + 1;
   try{
     const batch = db.batch();
-    batch.update(db.collection('employees').doc(code), { activation:genActivationCode(), loginN:n, active:true });
+    batch.update(db.collection('employees').doc(code), { loginN:n, active:true });
     batch.set(db.collection('logins').doc(code), { n });
     const claim = claimsCache[code];
     if(claim){ batch.delete(db.collection('claims').doc(code)); batch.delete(db.collection('sellers').doc(claim.uid)); }
     await batch.commit();
-    showToast('تمت إعادة التعيين ✓ أعطِ الموظف رمز التفعيل الجديد','✓','toast-success');
+    showToast('تمت إعادة التعيين ✓ يقدر الموظف ينشئ كلمة مرور جديدة','✓','toast-success');
   }catch(err){ console.error(err); showToast('تعذّر إعادة التعيين، حاول مجددًا','⚠️','toast-warning'); }
 }
 async function deleteEmployee(code){
@@ -2859,13 +2851,11 @@ function renderEmployeesTable(){
     const e = employeesCache[code], claimed = !!claimsCache[code];
     const status = !e.active ? '<span style="color:#e53e3e;font-weight:700;">موقوف</span>'
       : claimed ? '<span style="color:#2f9e5b;font-weight:700;">مفعّل ✓</span>'
-      : '<span style="color:#d08a1a;font-weight:700;">بانتظار التفعيل</span>';
-    const act = claimed ? '—' : `<span class="req-badge" dir="ltr" style="font-family:monospace;letter-spacing:1px;user-select:all;">${esc(e.activation)}</span>`;
+      : '<span style="color:#d08a1a;font-weight:700;">لم يدخل بعد</span>';
     return `<tr>
       <td><strong>${esc(code)}</strong></td>
       <td>${esc(e.name)}</td>
       <td style="white-space:nowrap">${status}</td>
-      <td>${act}</td>
       <td style="white-space:nowrap">
         <button onclick="setEmployeeActive('${esc(code)}', ${!e.active})" style="${btn}background:rgba(111,34,38,0.06);border:1px solid rgba(111,34,38,0.15);color:var(--primary);">${e.active?'إيقاف':'تشغيل'}</button>
         <button onclick="resetEmployee('${esc(code)}')" style="${btn}background:rgba(201,169,110,0.12);border:1px solid rgba(201,169,110,0.35);color:var(--text-dark);">إعادة تعيين</button>
@@ -2873,7 +2863,7 @@ function renderEmployeesTable(){
       </td>
     </tr>`;
   }).join('');
-  body.innerHTML = `<table class="req-table"><thead><tr><th>الكود</th><th>الاسم</th><th>الحالة</th><th>رمز التفعيل</th><th>إجراءات</th></tr></thead><tbody>${rows}</tbody></table>`;
+  body.innerHTML = `<table class="req-table"><thead><tr><th>الكود</th><th>الاسم</th><th>الحالة</th><th>إجراءات</th></tr></thead><tbody>${rows}</tbody></table>`;
 }
 
 function showManagerPage(){
