@@ -1000,6 +1000,26 @@ body.viewer-mode #managerInvoicesBody input{pointer-events:none;opacity:0.75;}
   #mainHeader{padding:40px 12px 0;}
   #mainHeader .search-wrap{width:100%;}
 }
+/* ── Tabs bar, breadcrumb and form fields (redesign) ── */
+.app-tabs{background:rgba(255,255,255,0.92);border:1px solid rgba(201,169,110,0.22);border-bottom:1px solid rgba(201,169,110,0.22);border-radius:18px;box-shadow:var(--card-shadow);margin-bottom:18px;overflow:hidden;}
+.app-tab{display:flex;align-items:center;justify-content:center;gap:8px;padding:16px 8px;font-size:15px;border-bottom:3px solid transparent;margin-bottom:0;}
+.app-tab .tab-ic{flex-shrink:0;opacity:0.8;}
+.app-tab.active{background:linear-gradient(180deg,transparent 60%,rgba(var(--primary-rgb),0.05));}
+.app-tab.active .tab-ic{opacity:1;}
+.app-tab:hover:not(.active){color:var(--primary);background:rgba(201,169,110,0.06);}
+.crumbs{display:flex;align-items:center;flex-wrap:wrap;gap:6px;font-size:12px;color:var(--text-mid);margin-bottom:6px;}
+.crumbs span:first-child{color:var(--primary);font-weight:700;}
+.crumbs i{font-style:normal;color:var(--text-light);}
+.crumbs b{color:var(--secondary-dark);font-weight:700;}
+.input-ic{position:relative;}
+.input-ic > svg{position:absolute;right:14px;top:50%;transform:translateY(-50%);color:var(--secondary-dark);pointer-events:none;}
+.input-ic > .field-input{width:100%;box-sizing:border-box;padding-right:42px;min-height:48px;background:white;}
+.input-ic > .field-input:focus{border-color:var(--primary);box-shadow:0 0 0 4px rgba(var(--primary-rgb),0.08);}
+.seller-card .field-label{font-size:13px;color:var(--text-mid);}
+@media(max-width:600px){
+  .app-tab{flex-direction:column;gap:4px;padding:10px 2px;font-size:12px;}
+  .app-tab .tab-ic{width:18px;height:18px;}
+}
 </style>
 </head>
 <body data-tab="new">
@@ -1199,17 +1219,17 @@ body.viewer-mode #managerInvoicesBody input{pointer-events:none;opacity:0.75;}
 
     <!-- TABS -->
     <div class="app-tabs">
-      <button class="app-tab active" id="tab-new" onclick="switchTab('new')">📝 طلب جديد</button>
-      <button class="app-tab" id="tab-myorders" onclick="switchTab('myorders')"><span id="ordersTabBadge"></span>طلباتي</button>
-      <button class="app-tab" id="tab-invoices" onclick="switchTab('invoices')">🧾 الفواتير</button>
-      <button class="app-tab" id="tab-install" onclick="switchTab('install')">🛠 التركيب</button>
+      <button class="app-tab active" id="tab-new" onclick="switchTab('new')"><svg class="tab-ic" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9Z"/><path d="M14 3v6h6M9 14h6M9 17h4"/></svg><span>طلب جديد</span></button>
+      <button class="app-tab" id="tab-myorders" onclick="switchTab('myorders')"><span id="ordersTabBadge"></span><svg class="tab-ic" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3 20 7.5v9L12 21l-8-4.5v-9Z"/><path d="M4 7.5 12 12l8-4.5M12 12v9"/></svg><span>طلباتي</span></button>
+      <button class="app-tab" id="tab-invoices" onclick="switchTab('invoices')"><svg class="tab-ic" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 3h12v18l-3-2-3 2-3-2-3 2Z"/><path d="M9 8h6M9 12h6M9 16h3"/></svg><span>الفواتير</span></button>
+      <button class="app-tab" id="tab-install" onclick="switchTab('install')"><svg class="tab-ic" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.7 6.3a4 4 0 0 0-5.4 5.2L3 17.8V21h3.2l6.3-6.3a4 4 0 0 0 5.2-5.4l-2.5 2.5-2.4-.6-.6-2.4Z"/></svg><span>التركيب</span></button>
     </div>
 
     <!-- TAB: NEW ORDER -->
     <div class="app-tab-panel show" id="panel-new">
 
     <div class="section-header reveal" style="animation:fadeInDown 0.6s 0.1s ease both;">
-      <div class="section-label">مكارم •فخامة في كل التفاصيل</div>
+      <nav class="crumbs" aria-label="المسار"><span>مكارم</span><i>‹</i><span>فخامة في كل التفاصيل</span><i>‹</i><b>تكوين الطلب</b></nav>
       <div class="section-title">تكوين الطلب</div>
     </div>
 
@@ -1217,13 +1237,15 @@ body.viewer-mode #managerInvoicesBody input{pointer-events:none;opacity:0.75;}
     <div class="seller-card reveal">
       <div class="field-group">
         <label class="field-label"><span class="req-star">*</span> كود البائع</label>
-        <input type="text" class="field-input" id="sellerCode" placeholder="أدخل كود البائع" oninput="updateSummary()">
+        <div class="input-ic"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg>
+        <input type="text" class="field-input" id="sellerCode" placeholder="أدخل كود البائع" oninput="updateSummary()"></div>
       </div>
       <div class="field-group">
         <label class="field-label"><span class="req-star">*</span> كود الفرع</label>
+        <div class="input-ic"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M12 21s-7-6.2-7-11.5a7 7 0 0 1 14 0C19 14.8 12 21 12 21Z"/><circle cx="12" cy="9.5" r="2.5"/></svg>
         <select class="field-input" id="branchCode" onchange="updateSummary()">
           <option value="">اختر الفرع</option>
-        </select>
+        </select></div>
       </div>
     </div>
 
@@ -1303,7 +1325,7 @@ body.viewer-mode #managerInvoicesBody input{pointer-events:none;opacity:0.75;}
   <!-- TAB: INVOICES -->
   <div class="app-tab-panel" id="panel-invoices">
     <div class="section-header reveal" style="animation:fadeInDown 0.6s 0.1s ease both;">
-      <div class="section-label">مكارم •فخامة في كل التفاصيل</div>
+      <nav class="crumbs" aria-label="المسار"><span>مكارم</span><i>‹</i><span>فخامة في كل التفاصيل</span><i>‹</i><b>إضافة فاتورة</b></nav>
       <div class="section-title">إضافة فاتورة</div>
     </div>
     <div class="seller-card reveal">
@@ -1373,7 +1395,7 @@ body.viewer-mode #managerInvoicesBody input{pointer-events:none;opacity:0.75;}
 
   <div class="app-tab-panel" id="panel-install">
     <div class="section-header reveal" style="animation:fadeInDown 0.6s 0.1s ease both;">
-      <div class="section-label">مكارم •فخامة في كل التفاصيل</div>
+      <nav class="crumbs" aria-label="المسار"><span>مكارم</span><i>‹</i><span>فخامة في كل التفاصيل</span><i>‹</i><b>التركيب</b></nav>
       <div class="section-title">التركيب</div>
     </div>
     <div id="myInstallWrap"></div>
