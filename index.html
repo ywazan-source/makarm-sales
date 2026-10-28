@@ -1053,7 +1053,7 @@ body.viewer-mode #managerInvoicesBody input{pointer-events:none;opacity:0.75;}
 .rq-body{position:relative;flex:1;display:flex;flex-direction:column;justify-content:center;padding:10px 16px;min-width:0;}
 .rq-num{position:absolute;top:4px;left:6px;font-size:11px;font-weight:700;color:var(--text-mid);background:var(--cream);border-radius:50%;width:30px;height:30px;display:flex;align-items:center;justify-content:center;}
 .request-card.rq .request-card-icon{width:52px;height:52px;border-radius:14px;background:var(--cream);color:var(--secondary-dark);display:flex;align-items:center;justify-content:center;margin:0 0 12px;transition:var(--transition);}
-.request-card.rq .request-card-title{font-size:18px;font-weight:800;color:var(--text-dark);margin-bottom:6px;}
+.request-card.rq .request-card-title{font-size:18px;font-weight:800;color:var(--text-dark);margin-bottom:0;}
 .rq-desc{font-size:12.5px;line-height:1.7;color:var(--text-mid);}
 .request-card.rq .request-check{top:4px;left:6px;width:30px;height:30px;font-size:14px;background:var(--primary);color:white;z-index:2;}
 .request-card.rq:hover{transform:translateY(-3px);box-shadow:var(--card-shadow-hover);border-color:rgba(var(--primary-rgb),0.35);}
@@ -1335,7 +1335,6 @@ body.viewer-mode #managerInvoicesBody input{pointer-events:none;opacity:0.75;}
             <div class="request-check">✓</div>
             <span class="request-card-icon"><svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 3h6l-1.5 3h-3Z"/><path d="M10.5 6C6 8.5 4 12 4 15.5 4 19 7.5 21 12 21s8-2 8-5.5C20 12 18 8.5 13.5 6"/><path d="M14 11.5c-.5-.7-1.2-1-2-1-1.1 0-2 .6-2 1.5s1 1.2 2 1.5 2 .7 2 1.6-.9 1.4-2 1.4c-.9 0-1.6-.3-2.1-1M12 9.5v1M12 16.5v1"/></svg></span>
             <div class="request-card-title">طلب تسعير</div>
-            <div class="rq-desc">الحصول على عرض سعر للمنتجات المطلوبة</div>
           </div>
         </div>
         <div class="request-card rq" role="button" tabindex="0" onclick="toggleRequest(this,'طلب تصميم')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();toggleRequest(this,'طلب تصميم')}">
@@ -1345,7 +1344,6 @@ body.viewer-mode #managerInvoicesBody input{pointer-events:none;opacity:0.75;}
             <div class="request-check">✓</div>
             <span class="request-card-icon"><svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15.5 4.5 4 4L8 20H4v-4Z"/><path d="m13 7 4 4"/><path d="M4 8 8 4l3 3M7 9l1.5-1.5M16 13l3 3-4 4-3-3M15 17l1.5-1.5"/></svg></span>
             <div class="request-card-title">طلب تصميم</div>
-            <div class="rq-desc">خدمة تصميم ودراسة المشروع بمساعدة فريقنا</div>
           </div>
         </div>
         <div class="request-card rq" role="button" tabindex="0" onclick="toggleRequest(this,'طلب فتح كود')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();toggleRequest(this,'طلب فتح كود')}">
@@ -1355,7 +1353,6 @@ body.viewer-mode #managerInvoicesBody input{pointer-events:none;opacity:0.75;}
             <div class="request-check">✓</div>
             <span class="request-card-icon"><svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="7.5" cy="15.5" r="4.5"/><path d="m10.7 12.3 9.3-9.3M16 7l3 3M14 9l2 2"/></svg></span>
             <div class="request-card-title">طلب فتح كود</div>
-            <div class="rq-desc">إنشاء كود عميل أو مشروع للتعامل معنا</div>
           </div>
         </div>
       </div>
