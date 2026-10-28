@@ -945,18 +945,6 @@ body.viewer-mode #managerInvoicesBody input{pointer-events:none;opacity:0.75;}
   .req-num-badge{flex-direction:row;align-items:center;margin:0;padding:6px 12px;font-size:12px;}
   .summary-toggle{background:rgba(var(--primary-rgb),0.08) !important;color:var(--primary) !important;border:1px solid rgba(var(--primary-rgb),0.2) !important;}
 }
-/* Seller + manager background photo, under a light veil so content stays readable */
-body, #managerPage{
-  background:
-    linear-gradient(rgba(250,246,240,0.15), rgba(250,246,240,0.15)),
-    url('app-bg.webp') center / cover no-repeat fixed,
-    var(--cream);
-}
-.app-tabs{background:rgba(250,246,240,0.82);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);}
-@media(max-width:1024px){
-  /* fixed backgrounds are janky on phones; scroll with the page instead */
-  body, #managerPage{background-attachment:scroll, scroll, scroll;}
-}
 </style>
 </head>
 <body data-tab="new">
