@@ -1070,6 +1070,10 @@ body.viewer-mode #managerInvoicesBody input{pointer-events:none;opacity:0.75;}
   .request-card.rq .request-card-title{font-size:15px;}
   .rq-desc{font-size:12px;}
 }
+/* Portrait category cards: tall photo, label under it */
+.view-grid .category-photo{height:auto;aspect-ratio:3/4;}
+.view-grid .category-item.active .category-photo{height:200px;aspect-ratio:auto;}
+@media(max-width:600px){ .view-grid .category-photo{height:auto;aspect-ratio:3/4;} }
 </style>
 </head>
 <body data-tab="new">
