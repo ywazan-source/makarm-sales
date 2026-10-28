@@ -20,6 +20,7 @@ service cloud.firestore {
     function isSeller() { return isLinked() && myRole() == 'seller'; }
     function isViewer() { return isLegacyViewer() || (isLinked() && myRole() == 'viewer'); }
     function isSupervisor() { return isLinked() && myRole() == 'supervisor'; }
+    function isInstaller() { return isLinked() && myRole() == 'installer'; }
 
     // Public lookup used by the login screen: only "does this code exist" + login counter
     match /logins/{code} {
@@ -56,12 +57,28 @@ service cloud.firestore {
 
     match /orders/{id} {
       allow read: if isManager() || isViewer() || isSupervisor()
+        || (isInstaller() && resource.data.withInstall == true)
         || (isSeller() && resource.data.sellerCode == myCode());
       allow create: if isSeller() && request.resource.data.sellerCode == myCode();
       allow update: if isManager() || isSupervisor()
+        // installer: installation invoices only, and only replies + "installation done"
+        || (isInstaller() && resource.data.withInstall == true
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['thread', 'installDone']))
         || (isSeller() && resource.data.sellerCode == myCode()
             && request.resource.data.sellerCode == myCode());
       allow delete: if false;
+    }
+
+    // Files attached to replies (one per document; never edited or deleted)
+    match /attachments/{id} {
+      allow read: if isManager() || isViewer() || isSupervisor()
+        || (isInstaller() && resource.data.install == true)
+        || (isSeller() && resource.data.sellerCode == myCode());
+      allow create: if (isManager() || isSupervisor()
+          || (isInstaller() && request.resource.data.install == true && request.resource.data.from == 'installer'))
+        && request.resource.data.data is string
+        && request.resource.data.data.size() < 1000000;
+      allow update, delete: if false;
     }
   }
 }

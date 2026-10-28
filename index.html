@@ -848,6 +848,16 @@ body.viewer-mode #managerPage .clear-btn,
 body.viewer-mode #managerPage [onclick*="hideOrderForManager"],
 body.viewer-mode #orderDetailFoot,
 body.viewer-mode #mtab-employees{display:none !important;}
+.installer-badge{display:none;margin-top:6px;font-size:12px;font-weight:700;color:var(--primary);background:rgba(201,169,110,0.18);border:1px solid rgba(201,169,110,0.4);border-radius:20px;padding:3px 12px;width:fit-content;}
+body.installer-mode .installer-badge{display:inline-block;}
+/* Installer: installation tab only; can tick "done" and reply, nothing else */
+body.installer-mode #mtab-orders,
+body.installer-mode #mtab-invoices,
+body.installer-mode #mtab-employees,
+body.installer-mode #managerStats,
+body.installer-mode #managerPage .clear-btn,
+body.installer-mode #managerPage [onclick*="hideOrderForManager"]{display:none !important;}
+body.installer-mode #managerInstallBody input[type="date"]{pointer-events:none;opacity:0.75;}
 .supervisor-badge{display:none;margin-top:6px;font-size:12px;font-weight:700;color:var(--primary);background:rgba(201,169,110,0.18);border:1px solid rgba(201,169,110,0.4);border-radius:20px;padding:3px 12px;width:fit-content;}
 body.supervisor-mode .supervisor-badge{display:inline-block;}
 /* Supervisor: full dashboard except employee admin and deleting */
@@ -952,6 +962,7 @@ body.viewer-mode #managerInvoicesBody input{pointer-events:none;opacity:0.75;}
       <div class="manager-sub">تقارير الطلبات الواردة</div>
       <div class="viewer-badge">👁 وضع الاطلاع فقط</div>
       <div class="supervisor-badge">🧑‍💼 وضع المشرف</div>
+      <div class="installer-badge">🛠 فني تركيب</div>
     </div>
   </div>
   <div class="manager-body">
@@ -1019,11 +1030,12 @@ body.viewer-mode #managerInvoicesBody input{pointer-events:none;opacity:0.75;}
               <option value="seller">بائع</option>
               <option value="viewer">مطّلع</option>
               <option value="supervisor">مشرف</option>
+              <option value="installer">فني تركيب</option>
             </select>
           </div>
           <button class="login-btn" style="margin-top:10px;max-width:200px;" onclick="addEmployees(this)">حفظ</button>
         </div>
-        <div style="padding:12px 24px;font-size:12px;color:var(--text-mid);"><b>بائع</b>: يرسل طلبات وفواتير ويشوف حقه بس. <b>مطّلع</b>: يشوف لوحة المدير بدون أي تعديل. <b>مشرف</b>: يرد ويعدّل الحالات والتواريخ، بدون إدارة الموظفين أو الحذف.<br>أول دخول للموظف: يكتب كوده ويضغط "أنشئ كلمة المرور". إذا نسي كلمة المرور اضغط "إعادة تعيين" وينشئ واحدة جديدة.</div>
+        <div style="padding:12px 24px;font-size:12px;color:var(--text-mid);"><b>بائع</b>: يرسل طلبات وفواتير ويشوف حقه بس. <b>مطّلع</b>: يشوف لوحة المدير بدون أي تعديل. <b>مشرف</b>: يرد ويعدّل الحالات والتواريخ، بدون إدارة الموظفين أو الحذف. <b>فني تركيب</b>: يشوف تبويب التركيب بس، يحط "تم التركيب" ويرد ويرفع صور وملفات.<br>أول دخول للموظف: يكتب كوده ويضغط "أنشئ كلمة المرور". إذا نسي كلمة المرور اضغط "إعادة تعيين" وينشئ واحدة جديدة.</div>
         <div id="managerEmployeesBody"></div>
       </div>
     </div>
@@ -1328,7 +1340,9 @@ function startOrdersListener(){
   if(ordersUnsub || !fbAuth.currentUser) return;
   // Sellers may only read their own orders (enforced by the Firestore rules too)
   let query = db.collection('orders');
-  if(!isManagerAuthed()){
+  if(staffRole==='installer'){
+    query = query.where('withInstall','==',true);
+  } else if(!isManagerAuthed()){
     const code = getSellerCode();
     if(!code) return;
     query = query.where('sellerCode','==',code);
@@ -2105,7 +2119,7 @@ function renderSellerOrders(){
   const allOrders = getOrders();
   const myOrders = code ? allOrders.filter(o=>o.sellerCode===code && !o.invoiceNumber && !o.hiddenForSeller) : [];
   // Update badge
-  const newReplies = myOrders.filter(o=>o.thread&&o.thread.some(m=>m.from==='manager'&&!m.seenBySeller)).length;
+  const newReplies = myOrders.filter(o=>o.thread&&o.thread.some(m=>m.from!=='seller'&&!m.seenBySeller)).length;
   const badge = document.getElementById('ordersTabBadge');
   if(badge) badge.innerHTML = newReplies > 0 ? `<span class="tab-badge">${newReplies}</span>` : '';
 
@@ -2126,7 +2140,7 @@ function renderSellerOrders(){
   wrap.innerHTML = [...shown].reverse().map(o=>{
     const i = idx[o.reqNumber];
     const cats = (o.categories||[]).map(c=>`<span class="seller-order-chip">${c.name} ×${c.qty||1}</span>`).join('');
-    const hasReply = o.thread && o.thread.some(m=>m.from==='manager');
+    const hasReply = o.thread && o.thread.some(m=>m.from!=='seller');
     const thread = renderThreadBubbles(o.thread||[], 'seller', i);
     const timeStr = o.time ? ` - ${o.time}` : '';
     return `<div class="seller-order-card">
@@ -2159,12 +2173,11 @@ function renderSellerOrders(){
 function renderThreadBubbles(thread, viewer, orderIdx){
   if(!thread||thread.length===0) return '<div style="color:var(--text-light);font-size:13px;margin-bottom:8px;">لا توجد رسائل بعد</div>';
   return thread.map(msg=>{
-    const isManager = msg.from==='manager';
-    const side = isManager ? 'from-manager' : 'from-seller';
-    const label = isManager ? '👔 المدير' : '👤 البائع';
+    const side = msg.from==='seller' ? 'from-seller' : 'from-manager';
+    const label = msgFromLabel(msg.from);
     const pdfLink = msg.pdfData ? `<div style="margin-top:6px;"><a href="${msg.pdfData}" download="MAKARM-reply.pdf" style="display:inline-flex;align-items:center;gap:5px;background:rgba(255,255,255,0.2);border-radius:6px;padding:4px 10px;font-size:11px;color:inherit;text-decoration:none;">📄 تحميل الملف المرفق</a></div>` : '';
     return `<div class="thread-msg ${side}">
-      <div class="thread-bubble">${esc(msg.text)}${pdfLink}</div>
+      <div class="thread-bubble">${esc(msg.text)}${pdfLink}${attachmentsHtml(msg)}</div>
       <div class="thread-meta">${label} • ${esc(msg.time)}</div>
     </div>`;
   }).join('');
@@ -2200,7 +2213,7 @@ function nowStamp(){
 const seenInFlight = new Set();
 async function markManagerMsgSeen(sellerCode){
   const ids = getOrders()
-    .filter(o=>o.sellerCode===sellerCode && (o.thread||[]).some(m=>m.from==='manager'&&!m.seenBySeller))
+    .filter(o=>o.sellerCode===sellerCode && (o.thread||[]).some(m=>m.from!=='seller'&&!m.seenBySeller))
     .map(o=>o.id).filter(id=>!seenInFlight.has(id));
   if(ids.length===0) return;
   await authReady;
@@ -2212,7 +2225,7 @@ async function markManagerMsgSeen(sellerCode){
         const ref = db.collection('orders').doc(id);
         const snap = await t.get(ref);
         if(!snap.exists) return;
-        const thread = (snap.data().thread||[]).map(m=>m.from==='manager'&&!m.seenBySeller?{...m,seenBySeller:true}:m);
+        const thread = (snap.data().thread||[]).map(m=>m.from!=='seller'&&!m.seenBySeller?{...m,seenBySeller:true}:m);
         t.update(ref, { thread });
       });
     }catch(err){ console.error('markManagerMsgSeen error', err); }
@@ -2224,7 +2237,7 @@ function updateOrdersBadge(){
   const code = getSellerCode();
   if(!code) return;
   const orders = getOrders();
-  const newReplies = orders.filter(o=>o.sellerCode===code&&!o.hiddenForSeller&&o.thread&&o.thread.some(m=>m.from==='manager'&&!m.seenBySeller)).length;
+  const newReplies = orders.filter(o=>o.sellerCode===code&&!o.hiddenForSeller&&o.thread&&o.thread.some(m=>m.from!=='seller'&&!m.seenBySeller)).length;
   const badge = document.getElementById('ordersTabBadge');
   if(badge) badge.innerHTML = newReplies > 0 ? `<span class="tab-badge">${newReplies}</span>` : '';
 }
@@ -2232,26 +2245,43 @@ function updateOrdersBadge(){
 // ══════════════════════════════════════════════════════
 // MANAGER REPLY SYSTEM
 // ══════════════════════════════════════════════════════
-let managerAttachedPDF = null; // { name, dataUrl }
+// Files attached to a reply are saved one per document in "attachments"
+// (Firestore caps a document at ~1MB, so they can't live inside the order).
+// The message only keeps { id, name, type } references.
+let pendingAttachments = { orderId:null, files:[] }; // files: { name, type, dataUrl }
+const MAX_ATTACH_BYTES = 900*1024; // base64 size per file, below the 1MB doc cap
+
+function msgFromLabel(from){
+  return from==='installer' ? '🛠 فني التركيب' : from==='manager' ? '👔 المدير' : '👤 البائع';
+}
 
 async function managerReply(orderId, btn){
   const input = document.getElementById(`mgr-reply-${orderId}`);
   const text = input ? input.value.trim() : '';
-  const pdf = managerAttachedPDF && managerAttachedPDF.orderId===orderId ? managerAttachedPDF : null;
-  if(!text && !pdf) { showToast('اكتب رداً أو أرفق ملفاً','⚠️','toast-warning'); return; }
+  const files = pendingAttachments.orderId===orderId ? pendingAttachments.files : [];
+  if(!text && !files.length) { showToast('اكتب رداً أو أرفق ملفاً','⚠️','toast-warning'); return; }
   if(btn && btn.disabled) return;
-  const msg = { id:newMsgId(), from:'manager', text: text||'', time: nowStamp(), seenBySeller: false };
-  if(pdf){ msg.pdfData = pdf.dataUrl; }
+  const order = getOrders().find(o=>o.id===orderId);
+  if(!order) return;
+  const from = staffRole==='installer' ? 'installer' : 'manager';
   setBusy(btn, true, '...');
   try{
     await authReady;
+    const refs = [];
+    for(const f of files){
+      const ref = await db.collection('attachments').add({
+        orderId, sellerCode: order.sellerCode||'', install: !!order.withInstall,
+        name: f.name, type: f.type, data: f.dataUrl, from, at: Date.now()
+      });
+      refs.push({ id: ref.id, name: f.name, type: f.type });
+    }
+    const msg = { id:newMsgId(), from, text: text||'', time: nowStamp(), seenBySeller: false };
+    if(refs.length) msg.attachments = refs;
     await withSlowNotice(db.collection('orders').doc(orderId).update({ thread: firebase.firestore.FieldValue.arrayUnion(msg) }), 'إرسال الرد');
     const cur = document.getElementById(`mgr-reply-${orderId}`);
     if(cur) cur.value='';
-    if(pdf) managerAttachedPDF = null;
-    const prevEl = document.getElementById(`attach-preview-${orderId}`);
-    if(prevEl) prevEl.innerHTML='';
-    showToast('تم إرسال الرد للبائع ✓','✓','toast-success');
+    clearAttach(orderId);
+    showToast('تم إرسال الرد ✓','✓','toast-success');
   }catch(err){
     console.error('managerReply error', err);
     showToast('تعذّر إرسال الرد، تحقق من الإنترنت','⚠️','toast-warning');
@@ -2260,38 +2290,93 @@ async function managerReply(orderId, btn){
   }
 }
 
-const MAX_PDF_BYTES = 700*1024;
 function attachChipHtml(orderId){
-  const p = managerAttachedPDF;
-  return p && p.orderId===orderId
-    ? `<div class="pdf-attach-chip">📄 ${esc(p.name)} <span class="pdf-attach-remove" onclick="clearAttach('${orderId}')">✕</span></div>` : '';
+  if(pendingAttachments.orderId!==orderId) return '';
+  return pendingAttachments.files.map((f,i)=>
+    `<div class="pdf-attach-chip">${f.type.startsWith('image/')?'🖼':'📄'} ${esc(f.name)} <span class="pdf-attach-remove" onclick="removeAttach('${orderId}',${i})">✕</span></div>`).join('');
+}
+function refreshAttachPreview(orderId){
+  const prevEl = document.getElementById(`attach-preview-${orderId}`);
+  if(prevEl) prevEl.innerHTML = attachChipHtml(orderId);
+}
+// Photos are shrunk to keep each one well under the per-file limit
+function compressImage(file){
+  return new Promise((resolve, reject)=>{
+    const img = new Image();
+    img.onload = ()=>{
+      const scale = Math.min(1, 1600/Math.max(img.width, img.height));
+      const c = document.createElement('canvas');
+      c.width = Math.round(img.width*scale); c.height = Math.round(img.height*scale);
+      c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+      URL.revokeObjectURL(img.src);
+      let q = 0.82, out = c.toDataURL('image/jpeg', q);
+      while(out.length > MAX_ATTACH_BYTES && q > 0.4){ q -= 0.12; out = c.toDataURL('image/jpeg', q); }
+      resolve(out);
+    };
+    img.onerror = reject;
+    img.src = URL.createObjectURL(file);
+  });
+}
+function readAsDataUrl(file){
+  return new Promise((resolve, reject)=>{ const r = new FileReader(); r.onload = e=>resolve(e.target.result); r.onerror = reject; r.readAsDataURL(file); });
 }
 function managerAttachPDF(orderId){
   const fileInput = document.createElement('input');
   fileInput.type = 'file';
-  fileInput.accept = 'application/pdf';
-  fileInput.onchange = (e)=>{
-    const file = e.target.files[0];
-    if(!file) return;
-    if(file.size > MAX_PDF_BYTES){
-      showToast('الملف كبير جدًا، الحد الأقصى 700 كيلوبايت','⚠️','toast-warning');
-      return;
+  fileInput.multiple = true;
+  fileInput.accept = 'image/*,application/pdf';
+  fileInput.onchange = async (e)=>{
+    if(pendingAttachments.orderId!==orderId) pendingAttachments = { orderId, files:[] };
+    for(const file of [...e.target.files]){
+      try{
+        const isImg = file.type.startsWith('image/');
+        const dataUrl = isImg ? await compressImage(file) : await readAsDataUrl(file);
+        if(dataUrl.length > MAX_ATTACH_BYTES){ showToast(`الملف ${file.name} كبير جدًا (الحد تقريبًا 650 كيلوبايت)`,'⚠️','toast-warning'); continue; }
+        pendingAttachments.files.push({ name: isImg ? file.name.replace(/\.\w+$/,'')+'.jpg' : file.name, type: isImg ? 'image/jpeg' : (file.type||'application/octet-stream'), dataUrl });
+      }catch(err){
+        console.error('attach error', err);
+        showToast(`تعذّر قراءة ${file.name}`,'⚠️','toast-warning');
+      }
     }
-    const reader = new FileReader();
-    reader.onload = (ev)=>{
-      managerAttachedPDF = { orderId, name: file.name, dataUrl: ev.target.result };
-      const prevEl = document.getElementById(`attach-preview-${orderId}`);
-      if(prevEl) prevEl.innerHTML = attachChipHtml(orderId);
-    };
-    reader.readAsDataURL(file);
+    refreshAttachPreview(orderId);
   };
   fileInput.click();
 }
-
+function removeAttach(orderId, i){
+  if(pendingAttachments.orderId!==orderId) return;
+  pendingAttachments.files.splice(i,1);
+  refreshAttachPreview(orderId);
+}
 function clearAttach(orderId){
-  managerAttachedPDF = null;
-  const prevEl = document.getElementById(`attach-preview-${orderId}`);
-  if(prevEl) prevEl.innerHTML='';
+  pendingAttachments = { orderId:null, files:[] };
+  refreshAttachPreview(orderId);
+}
+
+function attachmentsHtml(msg){
+  if(!msg.attachments || !msg.attachments.length) return '';
+  return `<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px;">${msg.attachments.map(a=>
+    `<button type="button" onclick="openAttachment('${esc(a.id)}')" style="display:inline-flex;align-items:center;gap:5px;background:rgba(255,255,255,0.2);border:1px solid rgba(201,169,110,0.35);border-radius:6px;padding:4px 10px;font-size:11px;color:inherit;cursor:pointer;font-family:Tajawal,sans-serif;">${(a.type||'').startsWith('image/')?'🖼':'📄'} ${esc(a.name)}</button>`).join('')}</div>`;
+}
+const attachmentCache = {};
+async function openAttachment(id){
+  try{
+    let a = attachmentCache[id];
+    if(!a){
+      showToast('جارٍ فتح الملف...','','toast-info');
+      const snap = await db.collection('attachments').doc(id).get();
+      if(!snap.exists){ showToast('الملف غير موجود','⚠️','toast-warning'); return; }
+      a = attachmentCache[id] = snap.data();
+    }
+    if((a.type||'').startsWith('image/')) openImageZoom(a.data);
+    else {
+      const link = document.createElement('a');
+      link.href = a.data; link.download = a.name || 'MAKARM-file';
+      document.body.appendChild(link); link.click(); link.remove();
+    }
+  }catch(err){
+    console.error('openAttachment error', err);
+    showToast('تعذّر فتح الملف','⚠️','toast-warning');
+  }
 }
 
 
@@ -2717,8 +2802,9 @@ async function managerSetFirstPassword(){
 }
 // Employee permissions set by the manager: 'seller' (default), 'viewer'
 // (read-only dashboard) or 'supervisor' (dashboard without employee admin)
-const ROLE_LABELS = { seller:'بائع', viewer:'مطّلع', supervisor:'مشرف' };
-let staffRole = null; // 'viewer' | 'supervisor' while such an employee is signed in
+const ROLE_LABELS = { seller:'بائع', viewer:'مطّلع', supervisor:'مشرف', installer:'فني تركيب' };
+const STAFF_ROLES = ['viewer','supervisor','installer'];
+let staffRole = null; // 'viewer' | 'supervisor' | 'installer' while such an employee is signed in
 
 // Confirms the signed-in account is still linked to `code` and returns the
 // employee's { name, role }, or null if it isn't
@@ -2733,7 +2819,7 @@ async function loadLinkedEmployee(code){
   return { name, role };
 }
 function enterLinkedAccount(code, emp){
-  staffRole = emp.role==='viewer' || emp.role==='supervisor' ? emp.role : null;
+  staffRole = STAFF_ROLES.includes(emp.role) ? emp.role : null;
   sessionStorage.setItem('mkrm_user', JSON.stringify({code, role: staffRole ? 'staff' : 'seller', name: emp.name}));
   document.getElementById('loginPage').classList.add('hidden');
   backToCodeStep();
@@ -3029,9 +3115,12 @@ function showManagerPage(){
   startOrdersListener();
   document.body.classList.toggle('viewer-mode', isViewer());
   document.body.classList.toggle('supervisor-mode', staffRole==='supervisor');
+  document.body.classList.toggle('installer-mode', staffRole==='installer');
   if(isRealManager()) startEmployeesListener();
   document.getElementById('managerPage').classList.add('show');
   renderManagerTable();
+  // The installer only works in the installation tab
+  if(staffRole==='installer') switchManagerTab('install');
 }
 
 function switchManagerTab(tab){
@@ -3304,7 +3393,7 @@ function showOrderDetail(idx){
     foot.innerHTML = `
       <div id="attach-preview-${o.id}" class="manager-pdf-attach-preview">${attachChipHtml(o.id)}</div>
       <div class="manager-reply-wrap">
-        <button class="manager-attach-btn" onclick="managerAttachPDF('${o.id}')">📎 ملف PDF</button>
+        <button class="manager-attach-btn" onclick="managerAttachPDF('${o.id}')">📎 صور / ملفات</button>
         <textarea class="manager-reply-input" id="mgr-reply-${o.id}" placeholder="اكتب ردك على البائع..." rows="1"></textarea>
         <button class="manager-send-btn" onclick="managerReply('${o.id}', this)">إرسال</button>
       </div>
@@ -3317,12 +3406,11 @@ function showOrderDetail(idx){
 function renderManagerThread(thread){
   if(!thread||thread.length===0) return '<div style="color:var(--text-light);font-size:13px;padding:8px 0;">لا توجد رسائل بعد</div>';
   return thread.map(msg=>{
-    const isManager = msg.from==='manager';
-    const side = isManager ? 'from-manager' : 'from-seller';
-    const label = isManager ? '👔 المدير' : '👤 البائع';
+    const side = msg.from==='seller' ? 'from-seller' : 'from-manager';
+    const label = msgFromLabel(msg.from);
     const pdfLink = msg.pdfData ? `<div style="margin-top:6px;"><a href="${msg.pdfData}" download="MAKARM-reply.pdf" style="display:inline-flex;align-items:center;gap:5px;background:rgba(255,255,255,0.2);border-radius:6px;padding:4px 10px;font-size:11px;color:inherit;text-decoration:none;">📄 تحميل الملف المرفق</a></div>` : '';
     return `<div class="thread-msg ${side}">
-      <div class="thread-bubble">${esc(msg.text)}${pdfLink}</div>
+      <div class="thread-bubble">${esc(msg.text)}${pdfLink}${attachmentsHtml(msg)}</div>
       <div class="thread-meta">${label} • ${esc(msg.time)}</div>
     </div>`;
   }).join('');
@@ -3468,7 +3556,7 @@ function globalLogout() {
   // clear cached data so the next person on this device can't see it
   ordersWanted = false;
   staffRole = null;
-  document.body.classList.remove('supervisor-mode');
+  document.body.classList.remove('supervisor-mode','installer-mode');
   stopOrdersListener();
   stopEmployeesListener();
   ordersCache = [];
