@@ -1020,6 +1020,32 @@ body.viewer-mode #managerInvoicesBody input{pointer-events:none;opacity:0.75;}
   .app-tab{flex-direction:column;gap:4px;padding:10px 2px;font-size:12px;}
   .app-tab .tab-ic{width:18px;height:18px;}
 }
+/* ── Manager / staff dashboard: same look as the seller pages ── */
+#managerPage{padding-top:0;}
+.manager-header{
+  justify-content:flex-start;gap:16px;padding:52px 32px 22px;min-height:132px;box-sizing:border-box;
+  background:
+    linear-gradient(180deg, rgba(250,246,240,0.30) 0%, rgba(250,246,240,0.6) 70%, rgba(250,246,240,0.88) 100%),
+    url('login-bg.webp') center 62% / cover no-repeat;
+  border-bottom:1px solid rgba(201,169,110,0.3);box-shadow:0 6px 28px rgba(var(--primary-dark-rgb),0.08);
+}
+.manager-logo{height:52px;width:auto;filter:drop-shadow(0 2px 6px rgba(255,255,255,0.8));}
+.manager-title{color:var(--primary);font-size:22px;}
+.manager-sub{color:var(--secondary-dark);font-weight:600;}
+.manager-body .crumbs{margin:-6px 0 12px;}
+.manager-tabs{gap:0;background:rgba(255,255,255,0.92);border:1px solid rgba(201,169,110,0.22);border-radius:18px;box-shadow:var(--card-shadow);overflow:hidden;margin-bottom:20px;}
+.manager-tab{flex:1;display:flex;align-items:center;justify-content:center;gap:8px;border:none;border-radius:0;background:transparent;padding:16px 10px;font-size:15px;border-bottom:3px solid transparent;}
+.manager-tab .tab-ic{flex-shrink:0;opacity:0.8;}
+.manager-tab:hover:not(.active){color:var(--primary);background:rgba(201,169,110,0.06);transform:none;}
+.manager-tab.active{background:linear-gradient(180deg,transparent 60%,rgba(var(--primary-rgb),0.05));color:var(--primary);border-bottom-color:var(--primary);box-shadow:none;}
+.manager-tab.active .tab-ic{opacity:1;}
+@media(max-width:600px){
+  .manager-header{padding:50px 16px 16px;min-height:0;}
+  .manager-logo{height:40px;}
+  .manager-title{font-size:17px;}
+  .manager-tab{flex-direction:column;gap:4px;padding:10px 2px;font-size:12px;min-height:0;}
+  .manager-tab .tab-ic{width:18px;height:18px;}
+}
 </style>
 </head>
 <body data-tab="new">
@@ -1081,8 +1107,9 @@ body.viewer-mode #managerInvoicesBody input{pointer-events:none;opacity:0.75;}
 <!-- MANAGER PAGE -->
 <div id="managerPage">
   <div class="manager-header">
+    <img class="manager-logo" id="managerLogoImg" src="" alt="MAKARM">
     <div>
-      <div class="manager-title">🏢 لوحة مدير الفروع</div>
+      <div class="manager-title">لوحة مدير الفروع</div>
       <div class="manager-sub">تقارير الطلبات الواردة</div>
       <div class="viewer-badge">👁 وضع الاطلاع فقط</div>
       <div class="supervisor-badge">🧑‍💼 وضع المشرف</div>
@@ -1091,11 +1118,12 @@ body.viewer-mode #managerInvoicesBody input{pointer-events:none;opacity:0.75;}
   </div>
   <div class="manager-body">
     <div class="manager-stats" id="managerStats"></div>
+    <nav class="crumbs" aria-label="المسار"><span>مكارم</span><i>‹</i><span>لوحة الإدارة</span><i>‹</i><b id="managerCrumb">الطلبات</b></nav>
     <div class="manager-tabs">
-      <button class="manager-tab active" id="mtab-orders" onclick="switchManagerTab('orders')">📋 الطلبات</button>
-      <button class="manager-tab" id="mtab-invoices" onclick="switchManagerTab('invoices')">🧾 الفواتير</button>
-      <button class="manager-tab" id="mtab-install" onclick="switchManagerTab('install')">🛠 التركيب</button>
-      <button class="manager-tab" id="mtab-employees" onclick="switchManagerTab('employees')">👥 الموظفين</button>
+      <button class="manager-tab active" id="mtab-orders" onclick="switchManagerTab('orders')"><svg class="tab-ic" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 4h6v3H9Z"/><path d="M9 5H6a1 1 0 0 0-1 1v14a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V6a1 1 0 0 0-1-1h-3"/><path d="M9 12h6M9 16h4"/></svg><span>الطلبات</span></button>
+      <button class="manager-tab" id="mtab-invoices" onclick="switchManagerTab('invoices')"><svg class="tab-ic" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 3h12v18l-3-2-3 2-3-2-3 2Z"/><path d="M9 8h6M9 12h6M9 16h3"/></svg><span>الفواتير</span></button>
+      <button class="manager-tab" id="mtab-install" onclick="switchManagerTab('install')"><svg class="tab-ic" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.7 6.3a4 4 0 0 0-5.4 5.2L3 17.8V21h3.2l6.3-6.3a4 4 0 0 0 5.2-5.4l-2.5 2.5-2.4-.6-.6-2.4Z"/></svg><span>التركيب</span></button>
+      <button class="manager-tab" id="mtab-employees" onclick="switchManagerTab('employees')"><svg class="tab-ic" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><circle cx="17" cy="9" r="2.5"/><path d="M16 14.5a5 5 0 0 1 5.5 5"/></svg><span>الموظفين</span></button>
     </div>
     <div class="manager-tab-panel show" id="mpanel-orders">
       <div class="manager-table-wrap">
@@ -3317,6 +3345,8 @@ function switchManagerTab(tab){
   document.querySelectorAll('.manager-tab-panel').forEach(p=>p.classList.remove('show'));
   document.getElementById('mtab-'+tab).classList.add('active');
   document.getElementById('mpanel-'+tab).classList.add('show');
+  const crumb = document.getElementById('managerCrumb');
+  if(crumb) crumb.textContent = document.querySelector(`#mtab-${tab} span`)?.textContent || '';
   if(tab==='invoices') renderManagerInvoicesTable();
   if(tab==='employees') renderEmployeesTable();
   if(tab==='install') renderManagerInstallTable();
@@ -3825,7 +3855,7 @@ window.addEventListener('DOMContentLoaded',()=>{
 
   // Set all logos and hide the loading screen up front, regardless of
   // which page (login / seller app / manager) we end up showing below
-  ['loginLogoImg','loadingLogoImg','headerLogoImg','summaryLogoImg'].forEach(id=>{
+  ['loginLogoImg','loadingLogoImg','headerLogoImg','summaryLogoImg','managerLogoImg'].forEach(id=>{
     const el=document.getElementById(id);
     if(el) el.src=LOGO_SRC;
   });
