@@ -982,6 +982,24 @@ body.viewer-mode #managerInvoicesBody input{pointer-events:none;opacity:0.75;}
   .view-grid .category-icon svg{width:18px;height:18px;}
   .categories-head-title{font-size:16px;}
 }
+/* ── Seller header: architectural photo behind logo, search and the top buttons ── */
+#mainHeader{
+  top:0; margin-top:0; height:112px; padding:40px 28px 0; box-sizing:border-box;
+  background:
+    linear-gradient(180deg, rgba(250,246,240,0.30) 0%, rgba(250,246,240,0.55) 70%, rgba(250,246,240,0.85) 100%),
+    url('login-bg.webp') center 62% / cover no-repeat;
+  backdrop-filter:none; -webkit-backdrop-filter:none;
+  border-bottom:1px solid rgba(201,169,110,0.3);
+}
+#mainHeader .search-wrap{width:min(520px,46vw);}
+#mainHeader .search-input,#mainHeader .search-input:focus{width:100%;background:rgba(255,255,255,0.92);border:1px solid rgba(255,255,255,0.9);box-shadow:0 8px 28px rgba(var(--primary-dark-rgb),0.14);padding-top:13px;padding-bottom:13px;font-size:14px;}
+#mainHeader .btn-icon{background:rgba(255,255,255,0.9);box-shadow:0 6px 18px rgba(var(--primary-dark-rgb),0.12);}
+.header-logo-img-wrap img{filter:drop-shadow(0 2px 6px rgba(255,255,255,0.8));}
+.refresh-btn-global{background:rgba(255,255,255,0.88);color:var(--primary);}
+@media(max-width:600px){
+  #mainHeader{padding:40px 12px 0;}
+  #mainHeader .search-wrap{width:100%;}
+}
 </style>
 </head>
 <body data-tab="new">
