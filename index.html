@@ -870,6 +870,15 @@ body.viewer-mode #managerInvoicesBody input{pointer-events:none;opacity:0.75;}
 .img-zoom-overlay{position:fixed;inset:0;z-index:20000;background:rgba(10,6,4,0.85);display:flex;align-items:center;justify-content:center;padding:16px;cursor:zoom-out;animation:imgZoomIn .2s ease;}
 .img-zoom-overlay img{max-width:100%;max-height:100%;object-fit:contain;border-radius:12px;box-shadow:0 20px 60px rgba(0,0,0,0.5);}
 @keyframes imgZoomIn{from{opacity:0}to{opacity:1}}
+.with-install-toggle{display:flex;align-items:center;gap:8px;white-space:nowrap;padding:0 14px;border-radius:var(--radius-sm);border:1.5px solid rgba(201,169,110,0.35);background:rgba(201,169,110,0.08);color:var(--primary);font-weight:700;font-size:14px;cursor:pointer;user-select:none;min-height:46px;}
+.with-install-toggle input{width:20px;height:20px;accent-color:var(--primary);cursor:pointer;}
+.with-install-toggle:has(input:checked){background:rgba(var(--primary-rgb),0.08);border-color:var(--primary);}
+.install-box{border:1.5px dashed rgba(var(--primary-rgb),0.25);border-radius:16px;padding:16px;background:rgba(201,169,110,0.05);animation:fadeInDown .3s ease both;}
+.install-box-title{font-weight:800;color:var(--primary);margin-bottom:12px;}
+.install-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+.install-grid .field-input,#invLinkedOrder{width:100%;box-sizing:border-box;min-width:0;}
+.install-chip{display:inline-block;margin-top:4px;font-size:11px;font-weight:700;color:var(--primary);background:rgba(201,169,110,0.15);border:1px solid rgba(201,169,110,0.35);border-radius:20px;padding:2px 8px;white-space:nowrap;}
+@media(max-width:600px){ .install-grid{grid-template-columns:1fr;} }
 </style>
 </head>
 <body data-tab="new">
@@ -984,7 +993,7 @@ body.viewer-mode #managerInvoicesBody input{pointer-events:none;opacity:0.75;}
     <div class="manager-tab-panel" id="mpanel-install">
       <div class="manager-table-wrap">
         <div class="manager-table-header"><div class="manager-table-title">🛠 التركيب</div></div>
-        <div class="manager-empty">قريباً: طلبات التركيب من البائعين بتظهر هنا</div>
+        <div id="managerInstallBody"></div>
       </div>
     </div>
     <div class="manager-tab-panel" id="mpanel-employees">
@@ -1164,7 +1173,29 @@ body.viewer-mode #managerInvoicesBody input{pointer-events:none;opacity:0.75;}
       </div>
       <div class="field-group">
         <label class="field-label"><span class="req-star">*</span> رقم الفاتورة</label>
-        <input type="text" class="field-input" id="invInvoiceNumber" placeholder="أدخل رقم الفاتورة">
+        <div style="display:flex;gap:10px;align-items:stretch;">
+          <input type="text" class="field-input" id="invInvoiceNumber" placeholder="أدخل رقم الفاتورة" style="flex:1;min-width:0;">
+          <label class="with-install-toggle"><input type="checkbox" id="invWithInstall" onchange="toggleInstallFields()"> مع التركيب</label>
+        </div>
+      </div>
+      <div class="field-group install-fields" id="invInstallFields" style="grid-column:1/-1;display:none;">
+        <div class="install-box">
+          <div class="install-box-title">🛠 فاتورة التركيب</div>
+          <div class="install-grid">
+            <div class="field-group">
+              <label class="field-label"><span class="req-star">*</span> رقم فاتورة التركيب</label>
+              <input type="text" class="field-input" id="invInstallNumber" placeholder="أدخل رقم فاتورة التركيب">
+            </div>
+            <div class="field-group">
+              <label class="field-label">موعد التركيب</label>
+              <input type="date" class="field-input" id="invInstallDate">
+            </div>
+            <div class="field-group" style="grid-column:1/-1;">
+              <label class="field-label">ملاحظات التركيب</label>
+              <textarea class="field-input" id="invInstallNotes" rows="2" placeholder="العنوان، وقت مناسب، أي تفاصيل للتركيب..." style="resize:vertical;font-family:'Tajawal',sans-serif;"></textarea>
+            </div>
+          </div>
+        </div>
       </div>
       <div class="field-group">
         <label class="field-label">التاريخ</label>
@@ -1203,11 +1234,7 @@ body.viewer-mode #managerInvoicesBody input{pointer-events:none;opacity:0.75;}
       <div class="section-label">مكارم •فخامة في كل التفاصيل</div>
       <div class="section-title">التركيب</div>
     </div>
-    <div class="seller-card" style="display:block;text-align:center;padding:40px 20px;color:var(--text-mid);">
-      <div style="font-size:40px;margin-bottom:10px;">🛠</div>
-      <div style="font-size:16px;font-weight:700;color:var(--primary);margin-bottom:6px;">قريباً</div>
-      <div style="font-size:13px;">هنا بتقدر ترسل طلبات التركيب وتتابعها</div>
-    </div>
+    <div id="myInstallWrap"></div>
   </div><!-- end panel-install -->
 
   </div><!-- end main-panel -->
@@ -2042,6 +2069,7 @@ function switchTab(tab){
     renderMyInvoices();
     populateLinkedOrders();
   }
+  if(tab==='install') renderMyInstalls();
   document.body.dataset.tab = tab;
   syncMobileSummaryPadding();
 }
@@ -2344,10 +2372,23 @@ async function submitInvoice(){
     linkedSel.classList.add('error');
     return;
   }
+  const withInstall = document.getElementById('invWithInstall').checked;
+  const installNumber = document.getElementById('invInstallNumber').value.trim();
+  if(withInstall && !installNumber){
+    showToast('يرجى إدخال رقم فاتورة التركيب','⚠️','toast-warning');
+    document.getElementById('invInstallNumber').classList.add('error');
+    return;
+  }
   const now=new Date();
   const dateStr=`${now.getDate()}/${now.getMonth()+1}/${now.getFullYear()}`;
   const timeStr=`${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
+  const install = withInstall ? {
+    withInstall: true, installNumber,
+    installDate: document.getElementById('invInstallDate').value || '',
+    installNotes: document.getElementById('invInstallNotes').value.trim()
+  } : {};
   const orderData = {
+    ...install,
     reqNumber: generateReqNum(),
     sellerCode, branchCode,
     date: dateStr, time: timeStr,
@@ -2367,6 +2408,9 @@ async function submitInvoice(){
     document.getElementById('invNotes').value='';
     linkedSel.value='';
     renderLinkedOrderPreview();
+    ['invInstallNumber','invInstallDate','invInstallNotes'].forEach(id=>document.getElementById(id).value='');
+    document.getElementById('invWithInstall').checked=false;
+    toggleInstallFields();
     document.querySelectorAll('#panel-invoices .field-input.error').forEach(el=>el.classList.remove('error'));
   }catch(err){
     console.error('submitInvoice error', err);
@@ -2374,6 +2418,19 @@ async function submitInvoice(){
   }finally{
     setBusy(btn, false);
   }
+}
+
+function toggleInstallFields(){
+  const on = document.getElementById('invWithInstall').checked;
+  document.getElementById('invInstallFields').style.display = on ? '' : 'none';
+  if(on) setTimeout(()=>document.getElementById('invInstallNumber').focus(), 50);
+  else document.getElementById('invInstallNumber').classList.remove('error');
+}
+
+function installSummaryHtml(o){
+  if(!o.withInstall) return '';
+  const when = o.installDate ? ` • ${esc(isoToDMY(o.installDate))}` : '';
+  return `<span class="install-chip">🛠 تركيب ${esc(o.installNumber||'')}${when}</span>`;
 }
 
 function populateLinkedOrders(){
@@ -2411,6 +2468,26 @@ function renderLinkedOrderPreview(){
   </div>`;
 }
 
+function renderMyInstalls(){
+  const wrap = document.getElementById('myInstallWrap');
+  if(!wrap) return;
+  const code = getSellerCode();
+  const list = code ? getOrders().filter(o=>o.sellerCode===code && o.withInstall && !o.hiddenForSeller).reverse() : [];
+  if(!list.length){
+    wrap.innerHTML = `<div class="seller-card" style="display:block;text-align:center;padding:40px 20px;color:var(--text-mid);">
+      <div style="font-size:40px;margin-bottom:10px;">🛠</div>
+      <div style="font-size:15px;font-weight:700;color:var(--primary);margin-bottom:6px;">لا توجد فواتير تركيب بعد</div>
+      <div style="font-size:13px;">عند إضافة فاتورة اختر "مع التركيب" وبتظهر هنا</div></div>`;
+    return;
+  }
+  wrap.innerHTML = list.map(o=>`<div class="seller-order-card"><div class="seller-order-head"><div>
+      <div class="seller-order-num">🛠 ${esc(o.installNumber||'—')}</div>
+      <div class="seller-order-date">فاتورة ${esc(o.invoiceNumber)} • فرع ${esc(o.branchCode)||'—'} • ${esc(o.date)||''}</div>
+      <div class="seller-order-date">موعد التركيب: <b>${o.installDate?esc(isoToDMY(o.installDate)):'لم يحدد'}</b></div>
+      ${o.installNotes?`<div class="seller-order-date" style="white-space:pre-wrap;">${esc(o.installNotes)}</div>`:''}
+    </div></div></div>`).join('');
+}
+
 function renderMyInvoices(){
   const code = getSellerCode();
   const wrap = document.getElementById('myInvoicesWrap');
@@ -2435,7 +2512,7 @@ function renderMyInvoices(){
     return `<div class="seller-order-card">
       <div class="seller-order-head">
         <div>
-          <div class="seller-order-num">🧾 ${esc(o.invoiceNumber)}</div>
+          <div class="seller-order-num">🧾 ${esc(o.invoiceNumber)}</div>${installSummaryHtml(o)}
           <div class="seller-order-date">فرع ${esc(o.branchCode)||'—'} • ${esc(o.date)||'—'}${esc(timeStr)}${o.linkedReqNumber?` • الطلب ${esc(o.linkedReqNumber)}`:''}</div>
         </div>
         ${completionCol}
@@ -2919,6 +2996,7 @@ function switchManagerTab(tab){
   document.getElementById('mpanel-'+tab).classList.add('show');
   if(tab==='invoices') renderManagerInvoicesTable();
   if(tab==='employees') renderEmployeesTable();
+  if(tab==='install') renderManagerInstallTable();
 }
 
 function renderManagerTable(){
@@ -2987,6 +3065,27 @@ function replyStatusBadge(o){
     : '<span style="display:inline-block;padding:3px 10px;border-radius:50px;font-size:11px;font-weight:700;background:rgba(245,158,11,0.12);color:#b45309;">⏳ لم يتم الرد</span>';
 }
 
+function renderManagerInstallTable(){
+  const body = document.getElementById('managerInstallBody');
+  if(!body) return;
+  const all = getOrders();
+  const list = all.filter(o=>o.withInstall && !o.hiddenForManager).reverse();
+  if(!list.length){ body.innerHTML='<div class="manager-empty">لا توجد فواتير تركيب بعد</div>'; return; }
+  const rows = list.map(o=>{
+    const idx = all.findIndex(x=>x.id===o.id);
+    return `<tr>
+      <td><span class="req-badge">${esc(o.installNumber||'—')}</span></td>
+      <td>${esc(o.invoiceNumber)}</td>
+      <td><strong>${esc(o.sellerCode)||'—'}</strong>${sellerNameOf(o)?`<div style="font-size:11px;color:var(--text-mid);">${esc(sellerNameOf(o))}</div>`:''}</td>
+      <td>${esc(o.branchCode)||'—'}</td>
+      <td style="white-space:nowrap">${o.installDate?esc(isoToDMY(o.installDate)):'—'}</td>
+      <td style="max-width:200px;font-size:12px;color:var(--text-mid);white-space:pre-wrap;">${esc(o.installNotes)||'—'}</td>
+      <td><button onclick="showOrderDetail(${idx})" style="background:rgba(var(--primary-rgb),0.08);border:1px solid rgba(var(--primary-rgb),0.15);color:var(--primary);border-radius:8px;padding:5px 12px;font-family:Tajawal,sans-serif;font-size:12px;font-weight:600;cursor:pointer;">رد / تفاصيل</button></td>
+    </tr>`;
+  }).join('');
+  body.innerHTML = `<table class="req-table"><thead><tr><th>فاتورة التركيب</th><th>الفاتورة</th><th>البائع</th><th>الفرع</th><th>موعد التركيب</th><th>ملاحظات</th><th>تفاصيل</th></tr></thead><tbody>${rows}</tbody></table>`;
+}
+
 function renderManagerInvoicesTable(){
   const allOrders = getOrders();
   const invoices = allOrders.filter(o=>o.invoiceNumber && !o.hiddenForManager);
@@ -3013,7 +3112,7 @@ function renderManagerInvoicesTable(){
     const hasNewReply = o.thread && o.thread.some(m=>m.from==='seller');
     const replyIndicator = hasNewReply ? `<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#f59e0b;margin-left:4px;" title="رد من البائع"></span>` : '';
     return `<tr>
-      <td><span class="req-badge">${esc(o.invoiceNumber)}</span></td>
+      <td><span class="req-badge">${esc(o.invoiceNumber)}</span>${o.withInstall?'<br>'+installSummaryHtml(o):''}</td>
       <td><strong>${esc(o.sellerCode)||'—'}</strong>${sellerNameOf(o)?`<div style="font-size:11px;color:var(--text-mid);">${esc(sellerNameOf(o))}</div>`:''}</td>
       <td>${esc(o.branchCode)||'—'}</td>
       <td style="white-space:nowrap">${esc(o.date)||'—'}${esc(timeStr)}</td>
@@ -3086,10 +3185,18 @@ function showOrderDetail(idx){
   if(!o) return;
   window.__openOrderDetailId = o.id;
   document.getElementById('detailReqNum').textContent = o.reqNumber||'—';
-  const invoicePart = (o.invoiceNumber ? ` • فاتورة ${o.invoiceNumber}` : '') + (o.linkedReqNumber ? ` • الطلب المرتبط ${o.linkedReqNumber}` : '');
+  const invoicePart = (o.invoiceNumber ? ` • فاتورة ${o.invoiceNumber}` : '') + (o.linkedReqNumber ? ` • الطلب المرتبط ${o.linkedReqNumber}` : '') + (o.withInstall ? ` • فاتورة التركيب ${o.installNumber||''}` : '');
   document.getElementById('detailMeta').textContent = `${o.sellerCode||''} • فرع ${o.branchCode||''}${invoicePart} • ${o.date||''} ${o.time?'- '+o.time:''}`;
 
   let html = '';
+  if(o.withInstall){
+    html += `<div class="order-detail-section"><div class="order-detail-label">🛠 التركيب</div>
+      <div class="order-detail-cat">
+        <div class="order-detail-cat-prop"><span class="order-detail-cat-key">رقم فاتورة التركيب:</span> <span class="order-detail-cat-val">${esc(o.installNumber||'—')}</span></div>
+        <div class="order-detail-cat-prop"><span class="order-detail-cat-key">موعد التركيب:</span> <span class="order-detail-cat-val">${o.installDate?esc(isoToDMY(o.installDate)):'—'}</span></div>
+        ${o.installNotes?`<div class="order-detail-cat-prop"><span class="order-detail-cat-key">ملاحظات:</span> <span class="order-detail-cat-val" style="white-space:pre-wrap;">${esc(o.installNotes)}</span></div>`:''}
+      </div></div>`;
+  }
   // Request types
   if(o.requestTypes && o.requestTypes.length>0){
     html += `<div class="order-detail-section">
@@ -3433,6 +3540,7 @@ document.addEventListener('orders-updated', ()=>{
     if(document.getElementById('mpanel-invoices')?.classList.contains('show')){
       renderManagerInvoicesTable();
     }
+    if(document.getElementById('mpanel-install')?.classList.contains('show')) renderManagerInstallTable();
     if(document.getElementById('orderDetailOverlay')?.classList.contains('show')){
       // Follow the open order by id, not list position, so it can't jump to another order
       const idx = getOrders().findIndex(o=>o.id===window.__openOrderDetailId);
@@ -3446,6 +3554,7 @@ document.addEventListener('orders-updated', ()=>{
     renderMyInvoices();
     populateLinkedOrders();
   }
+  if(document.getElementById('panel-install')?.classList.contains('show')) renderMyInstalls();
   updateOrdersBadge();
 });
 </script>
