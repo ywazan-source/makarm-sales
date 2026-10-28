@@ -942,6 +942,7 @@ body.viewer-mode #managerInvoicesBody input{pointer-events:none;opacity:0.75;}
     <div class="manager-tabs">
       <button class="manager-tab active" id="mtab-orders" onclick="switchManagerTab('orders')">📋 الطلبات</button>
       <button class="manager-tab" id="mtab-invoices" onclick="switchManagerTab('invoices')">🧾 الفواتير</button>
+      <button class="manager-tab" id="mtab-install" onclick="switchManagerTab('install')">🛠 التركيب</button>
       <button class="manager-tab" id="mtab-employees" onclick="switchManagerTab('employees')">👥 الموظفين</button>
     </div>
     <div class="manager-tab-panel show" id="mpanel-orders">
@@ -979,6 +980,12 @@ body.viewer-mode #managerInvoicesBody input{pointer-events:none;opacity:0.75;}
         <div id="managerInvoicesBody"></div>
       </div>
       <div class="credit-footer">تم التصميم والإنشاء بواسطة يمان وزان<br>© 2026 جميع الحقوق محفوظة · All rights reserved</div>
+    </div>
+    <div class="manager-tab-panel" id="mpanel-install">
+      <div class="manager-table-wrap">
+        <div class="manager-table-header"><div class="manager-table-title">🛠 التركيب</div></div>
+        <div class="manager-empty">قريباً: طلبات التركيب من البائعين بتظهر هنا</div>
+      </div>
     </div>
     <div class="manager-tab-panel" id="mpanel-employees">
       <div class="manager-table-wrap">
@@ -1054,6 +1061,7 @@ body.viewer-mode #managerInvoicesBody input{pointer-events:none;opacity:0.75;}
       <button class="app-tab active" id="tab-new" onclick="switchTab('new')">📝 طلب جديد</button>
       <button class="app-tab" id="tab-myorders" onclick="switchTab('myorders')"><span id="ordersTabBadge"></span>طلباتي</button>
       <button class="app-tab" id="tab-invoices" onclick="switchTab('invoices')">🧾 الفواتير</button>
+      <button class="app-tab" id="tab-install" onclick="switchTab('install')">🛠 التركيب</button>
     </div>
 
     <!-- TAB: NEW ORDER -->
@@ -1189,6 +1197,18 @@ body.viewer-mode #managerInvoicesBody input{pointer-events:none;opacity:0.75;}
     </div>
     <div class="credit-footer">تم التصميم والإنشاء بواسطة يمان وزان<br>© 2026 جميع الحقوق محفوظة · All rights reserved</div>
   </div><!-- end panel-invoices -->
+
+  <div class="app-tab-panel" id="panel-install">
+    <div class="section-header reveal" style="animation:fadeInDown 0.6s 0.1s ease both;">
+      <div class="section-label">مكارم •فخامة في كل التفاصيل</div>
+      <div class="section-title">التركيب</div>
+    </div>
+    <div class="seller-card" style="display:block;text-align:center;padding:40px 20px;color:var(--text-mid);">
+      <div style="font-size:40px;margin-bottom:10px;">🛠</div>
+      <div style="font-size:16px;font-weight:700;color:var(--primary);margin-bottom:6px;">قريباً</div>
+      <div style="font-size:13px;">هنا بتقدر ترسل طلبات التركيب وتتابعها</div>
+    </div>
+  </div><!-- end panel-install -->
 
   </div><!-- end main-panel -->
 
