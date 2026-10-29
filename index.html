@@ -1925,20 +1925,26 @@ function buildMagasil(el){
   el.appendChild(makeQtySection('magasil'));
 }
 
-// أحواض بورسلان داخلي — size (cm) → [price without shelf, price with shelf] (SAR)
+// أحواض بورسلان — size (cm) → [price without shelf, price with shelf] (SAR), per basin type
 const MAGASIL_PRICES = {
-  60:[1031,1378], 80:[1086,1474], 100:[1298,1770], 120:[1384,1998], 140:[1947,2648],
-  160:[2187,2985], 180:[2429,3302], 200:[2779,3653], 220:[3011,3906], 240:[3285,4264],
-  260:[3465,4643], 280:[3858,5233], 300:[4037,5505],
+  'حوض داخلي': { dims:'x55x25 cm',
+    60:[1031,1378], 80:[1086,1474], 100:[1298,1770], 120:[1384,1998], 140:[1947,2648],
+    160:[2187,2985], 180:[2429,3302], 200:[2779,3653], 220:[3011,3906], 240:[3285,4264],
+    260:[3465,4643], 280:[3858,5233], 300:[4037,5505] },
+  'حوض خارجي': { dims:'x60x25 cm',
+    60:[953,1300], 80:[1002,1390], 100:[1202,1674], 120:[1280,1894], 140:[1796,2497],
+    160:[2015,2813], 180:[2235,3109], 200:[2570,3443], 220:[2779,3673], 240:[3025,4004],
+    260:[3187,4365], 280:[3546,4921], 300:[3707,5175] },
 };
 const fmtSAR = n=>`${n.toLocaleString('en-US')} ر.س`;
 function updateMagasilPrice(){
-  const box = document.getElementById('magasilPrice');
   const st = getState('magasil');
-  const prices = st.design==='حوض داخلي' ? MAGASIL_PRICES[parseInt(st.size)] : null;
-  const before = st.price;
-  // Prices printed on the chips themselves (internal basin only)
-  const inner = st.design==='حوض داخلي';
+  const table = MAGASIL_PRICES[st.design] || null;
+  const dims = table ? table.dims : MAGASIL_PRICES['حوض داخلي'].dims;
+  const shelfIdx = st.shelf==='مع رف' ? 1 : st.shelf==='بدون رف' ? 0 : -1;
+  const before = st.price, beforeSize = st.size;
+  // Size labels follow the basin type; keep the stored size in the same form
+  if(st.size && parseInt(st.size)) st.size = parseInt(st.size) + dims;
   const setChipPrice = (btn, text)=>{
     let tag = btn.querySelector('.chip-price');
     if(!text){ if(tag) tag.remove(); return; }
@@ -1946,27 +1952,17 @@ function updateMagasilPrice(){
     tag.textContent = text;
   };
   document.querySelectorAll('#magasilSizes .option-chip').forEach(btn=>{
-    const p = inner ? MAGASIL_PRICES[parseInt(btn.querySelector('span').textContent)] : null;
-    const shelfIdx = st.shelf==='مع رف' ? 1 : st.shelf==='بدون رف' ? 0 : -1;
+    const label = btn.querySelector('span');
+    const w = parseInt(label.textContent);
+    label.textContent = w + dims;
+    const p = table ? table[w] : null;
     setChipPrice(btn, p && shelfIdx>=0 ? fmtSAR(p[shelfIdx]) : '');
   });
-  if(!prices){
-    delete st.price;
-    if(box){ box.style.display='none'; box.innerHTML=''; }
-  } else {
-    const dims = `${st.size}×55×25 سم`;
-    if(st.shelf==='مع رف' || st.shelf==='بدون رف'){
-      const val = prices[st.shelf==='مع رف' ? 1 : 0];
-      st.price = fmtSAR(val);
-      if(box){ box.style.display=''; box.innerHTML = `<span>السعر (${esc(st.shelf)}) • ${dims}</span><b>${fmtSAR(val)}</b>`; }
-    } else {
-      delete st.price;
-      if(box){ box.style.display=''; box.innerHTML = `<span>${dims}</span><b>بدون رف: ${fmtSAR(prices[0])} • مع رف: ${fmtSAR(prices[1])}</b>`; }
-    }
-  }
-  if(before !== st.price) updateSummary();
+  const prices = table ? table[parseInt(st.size)] : null;
+  if(prices && shelfIdx>=0) st.price = fmtSAR(prices[shelfIdx]);
+  else delete st.price;
+  if(before !== st.price || beforeSize !== st.size) updateSummary();
 }
-
 function buildGlassMirror(el){
   // شاور and مرايا can both be picked; each gets its own block and measurements
   const KEYS = {
