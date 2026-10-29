@@ -1123,9 +1123,11 @@ body.viewer-mode #managerInvoicesBody input{pointer-events:none;opacity:0.75;}
 .magasil-price span{font-size:12px;color:var(--text-mid);}
 .magasil-price b{font-size:16px;color:var(--primary);}
 .img-upload-btn{box-sizing:border-box;max-width:100%;}
+#magasilSizes .options-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;}
+#magasilSizes .option-chip{width:100%;margin:0;}
 #magasilSizes{border-top:1px solid rgba(var(--primary-rgb),0.15);padding-top:12px;margin-top:4px;}
 .option-chip:has(.chip-price){flex-direction:column;gap:2px;line-height:1.2;}
-.option-chip .chip-price{display:block;font-size:10.5px;font-weight:700;color:var(--primary);opacity:.85;white-space:nowrap;direction:ltr;unicode-bidi:isolate;}
+.option-chip .chip-price{display:block;font-size:10.5px;font-weight:700;color:var(--primary);opacity:.85;white-space:nowrap;}
 .option-chip.selected .chip-price{color:inherit;opacity:.95;}
 </style>
 </head>
