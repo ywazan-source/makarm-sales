@@ -1122,6 +1122,9 @@ body.viewer-mode #managerInvoicesBody input{pointer-events:none;opacity:0.75;}
 .magasil-price{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin:6px 0 14px;padding:12px 16px;border-radius:14px;background:rgba(var(--primary-rgb),0.05);border:1px solid rgba(var(--primary-rgb),0.18);}
 .magasil-price span{font-size:12px;color:var(--text-mid);}
 .magasil-price b{font-size:16px;color:var(--primary);}
+.option-chip:has(.chip-price){flex-direction:column;gap:2px;line-height:1.2;}
+.option-chip .chip-price{display:block;font-size:10.5px;font-weight:700;color:var(--primary);opacity:.85;white-space:nowrap;}
+.option-chip.selected .chip-price{color:inherit;opacity:.95;}
 </style>
 </head>
 <body data-tab="new">
@@ -1899,13 +1902,17 @@ function buildMagasil(el){
   el.appendChild(step1);
 
   // Size chips + custom
-  el.appendChild(makeChipsSection('المقاس (سم)',['60','80','100','120','140','160','180','200','220','240','260','280','300'],'magasil','size',null,false,true));
+  const sizeSec = makeChipsSection('المقاس (سم)',['60','80','100','120','140','160','180','200','220','240','260','280','300'],'magasil','size',null,false,true);
+  sizeSec.id = 'magasilSizes';
+  el.appendChild(sizeSec);
   // Custom size input
   el.appendChild(makeInlineSection('مقاس مخصص','magasil','sizeCustom','أدخل المقاس المطلوب...'));
   // Material number
   el.appendChild(makeInlineSection('رقم المادة','magasil','materialNum','أدخل رقم المادة...'));
   // رف
-  el.appendChild(makeChipsSection('الرف',['مع رف','بدون رف'],'magasil','shelf',null,false,true));
+  const shelfSec = makeChipsSection('الرف',['مع رف','بدون رف'],'magasil','shelf',null,false,true);
+  shelfSec.id = 'magasilShelves';
+  el.appendChild(shelfSec);
   // Price of the internal porcelain basin for the picked size / shelf
   const priceBox = document.createElement('div');
   priceBox.className = 'magasil-price'; priceBox.id = 'magasilPrice';
@@ -1929,6 +1936,22 @@ function updateMagasilPrice(){
   const st = getState('magasil');
   const prices = st.design==='حوض داخلي' ? MAGASIL_PRICES[st.size] : null;
   const before = st.price;
+  // Prices printed on the chips themselves (internal basin only)
+  const inner = st.design==='حوض داخلي';
+  const setChipPrice = (btn, text)=>{
+    let tag = btn.querySelector('.chip-price');
+    if(!text){ if(tag) tag.remove(); return; }
+    if(!tag){ tag = document.createElement('small'); tag.className='chip-price'; btn.appendChild(tag); }
+    tag.textContent = text;
+  };
+  document.querySelectorAll('#magasilSizes .option-chip').forEach(btn=>{
+    const p = inner ? MAGASIL_PRICES[btn.querySelector('span').textContent] : null;
+    const shelfIdx = st.shelf==='مع رف' ? 1 : st.shelf==='بدون رف' ? 0 : -1;
+    setChipPrice(btn, !p ? '' : shelfIdx>=0 ? fmtSAR(p[shelfIdx]) : `${p[0].toLocaleString('en-US')} / ${p[1].toLocaleString('en-US')}`);
+  });
+  document.querySelectorAll('#magasilShelves .option-chip').forEach(btn=>{
+    setChipPrice(btn, prices ? fmtSAR(prices[btn.querySelector('span').textContent==='مع رف' ? 1 : 0]) : '');
+  });
   if(!prices){
     delete st.price;
     if(box){ box.style.display='none'; box.innerHTML=''; }
