@@ -1915,9 +1915,6 @@ function buildMagasil(el){
   // Material number
   el.appendChild(makeInlineSection('رقم المادة','magasil','materialNum','أدخل رقم المادة...'));
   // Price of the internal porcelain basin for the picked size / shelf
-  const priceBox = document.createElement('div');
-  priceBox.className = 'magasil-price'; priceBox.id = 'magasilPrice';
-  el.appendChild(priceBox);
   el.addEventListener('click', ()=>setTimeout(updateMagasilPrice, 0));
   updateMagasilPrice();
   // Qty
