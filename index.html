@@ -1904,7 +1904,7 @@ function buildMagasil(el){
   el.appendChild(step1);
 
   // Size chips + custom
-  const sizeSec = makeChipsSection('المقاس (سم)',['60','80','100','120','140','160','180','200','220','240','260','280','300'],'magasil','size',null,false,true);
+  const sizeSec = makeChipsSection('المقاس (سم)',['60','80','100','120','140','160','180','200','220','240','260','280','300'].map(w=>w+'x55x25 cm'),'magasil','size',null,false,true);
   sizeSec.id = 'magasilSizes';
   // رف first — the size chips then show the price for the picked option
   const shelfSec = makeChipsSection('الرف',['مع رف','بدون رف'],'magasil','shelf',null,false,true);
@@ -1933,7 +1933,7 @@ const fmtSAR = n=>`${n.toLocaleString('en-US')} ر.س`;
 function updateMagasilPrice(){
   const box = document.getElementById('magasilPrice');
   const st = getState('magasil');
-  const prices = st.design==='حوض داخلي' ? MAGASIL_PRICES[st.size] : null;
+  const prices = st.design==='حوض داخلي' ? MAGASIL_PRICES[parseInt(st.size)] : null;
   const before = st.price;
   // Prices printed on the chips themselves (internal basin only)
   const inner = st.design==='حوض داخلي';
@@ -1944,7 +1944,7 @@ function updateMagasilPrice(){
     tag.textContent = text;
   };
   document.querySelectorAll('#magasilSizes .option-chip').forEach(btn=>{
-    const p = inner ? MAGASIL_PRICES[btn.querySelector('span').textContent] : null;
+    const p = inner ? MAGASIL_PRICES[parseInt(btn.querySelector('span').textContent)] : null;
     const shelfIdx = st.shelf==='مع رف' ? 1 : st.shelf==='بدون رف' ? 0 : -1;
     setChipPrice(btn, p && shelfIdx>=0 ? fmtSAR(p[shelfIdx]) : '');
   });
